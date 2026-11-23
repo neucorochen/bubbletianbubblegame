@@ -35,7 +35,6 @@ body {
   display: block;
 }
 
-/* Мягкое дыхание солнца */
 .sun-pulse {
   transform-origin: 155px 145px;
   animation: sunPulse 7s ease-in-out infinite;
@@ -46,7 +45,6 @@ body {
   50%      { transform: scale(1.08); opacity: 1; }
 }
 
-/* Плавное мерцание радуги */
 .rainbow-arc {
   animation: rainbowGlow 9s ease-in-out infinite;
 }
@@ -56,7 +54,6 @@ body {
   50%      { opacity: 0.98; }
 }
 
-/* Движение облаков */
 .cloud {
   will-change: transform;
 }
@@ -70,7 +67,6 @@ body {
   50%      { transform: translate3d(38px, -6px, 0); }
 }
 
-/* Переливы воды на озере */
 .lake-shimmer {
   animation: lakeShimmer 6s ease-in-out infinite;
 }
@@ -80,7 +76,6 @@ body {
   50%      { transform: translate3d(14px, 0, 0); opacity: 0.65; }
 }
 
-/* Движущиеся радужные мыльные пузыри */
 .bg-orb {
   position: absolute;
   bottom: -180px;
@@ -113,7 +108,6 @@ body {
   100% { transform: translate3d(calc(var(--drift) * -0.4), -125vh, 0) scale(0.96); opacity: 0; }
 }
 
-/* Крупные глянцевые сферы на переднем плане у травы */
 .fg-orb {
   position: absolute;
   border-radius: 50%;
@@ -186,7 +180,6 @@ body {
   background: linear-gradient(180deg, #ff998a 0%, #e04535 50%, #c7281a 52%, #e86b58 100%);
 }
 
-/* Глянцевая шапка */
 .aero-header {
   display: flex;
   align-items: center;
@@ -447,6 +440,95 @@ canvas {
   color: #367199;
 }
 
+/* --- ПАРЯЩАЯ ДЕВОЧКА И ЖЕЛЕЙНЫЙ ДИАЛОГОВЫЙ ПУЗЫРЬ --- */
+.mascot-box {
+  position: relative;
+  flex: 1;
+  min-height: 185px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding-top: 46px;
+  pointer-events: none;
+}
+
+.mascot-float {
+  will-change: transform;
+  animation: mascotFloat 3.4s ease-in-out infinite;
+}
+
+@keyframes mascotFloat {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(-1.5deg); }
+  50%      { transform: translate3d(0, -11px, 0) rotate(1.5deg); }
+}
+
+.mascot-img {
+  display: block;
+  width: 155px;
+  height: auto;
+  filter: drop-shadow(0 8px 12px rgba(10, 95, 150, 0.24));
+  will-change: transform;
+}
+
+.mascot-img.happy-jump {
+  animation: jellyBtn 0.52s cubic-bezier(0.28, 0.84, 0.42, 1);
+}
+
+.speech-bubble {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translate3d(-50%, 8px, 0) scale(0.6);
+  opacity: 0;
+  z-index: 5;
+  max-width: 215px;
+  padding: 7px 13px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 900;
+  text-align: center;
+  line-height: 1.2;
+  color: #0b4a78;
+  background: linear-gradient(180deg, #ffffff 0%, #e4f7ff 100%);
+  border: 2px solid #76bce6;
+  box-shadow:
+    0 6px 14px rgba(10, 90, 145, 0.22),
+    inset 0 1.5px 0 #ffffff;
+  transition: opacity 0.18s ease, transform 0.2s ease;
+  will-change: transform, opacity;
+}
+
+.speech-bubble::after {
+  content: "";
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  transform: translateX(-50%) rotate(45deg);
+  background: #e4f7ff;
+  border-right: 2px solid #76bce6;
+  border-bottom: 2px solid #76bce6;
+}
+
+.speech-bubble.show {
+  opacity: 1;
+  transform: translate3d(-50%, 0, 0) scale(1);
+}
+
+.speech-bubble.speech-pop {
+  animation: speechJelly 0.52s cubic-bezier(0.28, 0.84, 0.42, 1) forwards;
+}
+
+@keyframes speechJelly {
+  0%   { opacity: 0; transform: translate3d(-50%, 10px, 0) scale(0.55, 0.45); }
+  40%  { opacity: 1; transform: translate3d(-50%, -4px, 0) scale(1.12, 0.88); }
+  65%  { opacity: 1; transform: translate3d(-50%, 1px, 0) scale(0.95, 1.07); }
+  85%  { opacity: 1; transform: translate3d(-50%, 0, 0) scale(1.03, 0.98); }
+  100% { opacity: 1; transform: translate3d(-50%, 0, 0) scale(1, 1); }
+}
+
 /* Экран проигрыша */
 .overlay {
   position: absolute;
@@ -488,11 +570,199 @@ canvas {
   color: #1d5b86;
 }
 
+/* --- МОБИЛЬНАЯ ВЕРСИЯ (ВСЁ В ОДИН ЭКРАН БЕЗ ПРОКРУТКИ + ОПТИМИЗАЦИЯ) --- */
 @media (max-width: 720px) {
-  .aero-body {
-    grid-template-columns: 1fr;
+  /* Отключаем тяжёлые фоновые анимации на телефонах, чтобы не лагало */
+  .cloud, .sun-pulse, .rainbow-arc, .lake-shimmer, .fg-orb {
+    animation: none;
   }
+  .orb-4, .orb-5, .orb-6, .orb-7, .fg-orb {
+    display: none;
+  }
+
+  body {
+    padding: 4px;
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: hidden;
+  }
+
+  .aero-window {
+    height: 100%;
+    max-width: 100%;
+    padding: 4px;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .window-bar {
+    display: none;
+  }
+
+  .aero-header {
+    padding: 5px 10px;
+    border-radius: 9px 9px 0 0;
+  }
+
   .brand-logo {
-    font-size: 19px;
+    font-size: 15px;
+    -webkit-text-stroke: 3.5px #0b5d8a;
+  }
+
+  .header-status {
+    display: none;
+  }
+
+  /* Перестраиваем сетку: сверху очки, по центру игра, снизу кнопки и девочка */
+  .aero-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 6px;
+  }
+
+  /* Делаем элементы side-col самостоятельными для перестановки */
+  .side-col {
+    display: contents;
+  }
+
+  /* 1. Очки и рекорд — САМЫЕ ВЕРХНИЕ */
+  .card-stats {
+    order: 1;
+    flex-direction: row;
+    justify-content: space-around;
+    align-items: center;
+    padding: 5px 10px;
+    gap: 10px;
+    border-radius: 10px;
+  }
+
+  .card-stats .card-title {
+    display: none;
+  }
+
+  .stat-row {
+    gap: 6px;
+    font-size: 12px;
+  }
+
+  .stat-row strong {
+    font-size: 16px;
+  }
+
+  /* 2. Игровое поле — занимает всё оставшееся место по центру */
+  .game-card {
+    order: 2;
+    flex: 1;
+    min-height: 0;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .game-wrap {
+    height: 100%;
+    width: auto;
+    max-width: 100%;
+    aspect-ratio: 480 / 660;
+  }
+
+  /* 3. Компактная полоска прогресса + кнопка смены */
+  .card-drop {
+    order: 3;
+    flex-direction: row;
+    align-items: center;
+    padding: 5px 8px;
+    gap: 8px;
+    border-radius: 10px;
+    padding-right: 76px; /* место справа под девочку */
+  }
+
+  .card-drop .card-title {
+    display: none;
+  }
+
+  .drop-caption {
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .progress-track {
+    flex: 1;
+    height: 10px;
+  }
+
+  .card-drop .btn-lime {
+    width: auto;
+    padding: 6px 10px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  /* 4. Кнопки музыки и перезапуска в одну строку */
+  .card-controls {
+    order: 4;
+    flex-direction: row;
+    padding: 5px 8px;
+    gap: 6px;
+    border-radius: 10px;
+    padding-right: 76px; /* место справа под девочку */
+  }
+
+  .card-controls .card-title,
+  .hint-text {
+    display: none;
+  }
+
+  .card-controls .btn-glass {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+
+  /* 5. Девочка аккуратно парит в правом нижнем углу без прокрутки */
+  .mascot-box {
+    position: absolute;
+    right: 6px;
+    bottom: 6px;
+    min-height: 0;
+    padding: 0;
+    z-index: 10;
+  }
+
+  .mascot-img {
+    width: 68px;
+  }
+
+  .speech-bubble {
+    top: auto;
+    bottom: 72px;
+    left: auto;
+    right: 0;
+    transform: translate3d(0, 8px, 0) scale(0.6);
+    max-width: 165px;
+    font-size: 11px;
+    padding: 5px 10px;
+  }
+
+  .speech-bubble::after {
+    left: auto;
+    right: 22px;
+    transform: rotate(45deg);
+  }
+
+  .speech-bubble.show {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  @keyframes speechJelly {
+    0%   { opacity: 0; transform: translate3d(0, 10px, 0) scale(0.55, 0.45); }
+    40%  { opacity: 1; transform: translate3d(0, -4px, 0) scale(1.12, 0.88); }
+    65%  { opacity: 1; transform: translate3d(0, 1px, 0) scale(0.95, 1.07); }
+    85%  { opacity: 1; transform: translate3d(0, 0, 0) scale(1.03, 0.98); }
+    100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1, 1); }
   }
 }
