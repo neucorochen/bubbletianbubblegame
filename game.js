@@ -5,6 +5,7 @@ const scoreEl = document.getElementById("scoreEl");
 const bestEl = document.getElementById("bestEl");
 const dropEl = document.getElementById("dropEl");
 const resetBtn = document.getElementById("resetBtn");
+const musicBtn = document.getElementById("musicBtn");
 const gameOverOverlay = document.getElementById("gameOverOverlay");
 const finalScoreText = document.getElementById("finalScoreText");
 const playAgainBtn = document.getElementById("playAgainBtn");
@@ -18,10 +19,9 @@ const DANGER_ROW = 13;
 const DANGER_Y = DANGER_ROW * ROW_H + R;
 const CANNON_X = W / 2;
 const CANNON_Y = H - 48;
-const SHOT_SPEED = 14;
+const SHOT_SPEED = 14.5;
 const SHOTS_PER_DROP = 6;
 
-// Сочные желейные цвета в палитре Frutiger Aero
 const COLORS = [
   { main: "#ff3b7f", glow: "#ff9ec4", deep: "#b8004c" }, // малиновый
   { main: "#00b4ff", glow: "#a3ecff", deep: "#005fa3" }, // аквамарин
@@ -32,6 +32,7 @@ const COLORS = [
 ];
 
 let grid = [];
+let cellPhysics = {}; // Хранит желейную пружину и скольжение для каждой ячейки
 let rowOffset = 0;
 let score = 0;
 let bestScore = 0;
@@ -44,7 +45,6 @@ let particles = [];
 let fallingBubbles = [];
 let gameOver = false;
 
-// Фоновые парящие пузырьки внутри поля
 const ambientBubbles = Array.from({ length: 14 }, () => ({
   x: Math.random() * W,
   y: Math.random() * H,
@@ -85,6 +85,32 @@ function getNeighbors(r, c) {
   return res;
 }
 
+// Желейный импульс и скользящее смещение для ячейки
+function triggerJelly(r, c, strength = 0.28, dx = 0, dy = 0) {
+  const key = `${r},${c}`;
+  if (!cellPhysics[key]) {
+    cellPhysics[key] = { ox: 0, oy: 0, ovx: 0, ovy: 0, wobble: 0, wv: 0 };
+  }
+  const p = cellPhysics[key];
+  p.ox += dx;
+  p.oy += dy;
+  p.wv += strength;
+}
+
+// Волна колебаний по соседним шарикам при ударе
+function rippleNeighbors(r, c, impactVx, impactVy) {
+  for (const [nr, nc] of getNeighbors(r, c)) {
+    if (grid[nr][nc] !== null) {
+      triggerJelly(nr, nc, 0.16, impactVx * 0.35, impactVy * 0.35);
+      for (const [nnr, nnc] of getNeighbors(nr, nc)) {
+        if ((nnr !== r || nnc !== c) && grid[nnr][nnc] !== null) {
+          triggerJelly(nnr, nnc, 0.06, impactVx * 0.12, impactVy * 0.12);
+        }
+      }
+    }
+  }
+}
+
 function createEmptyRow(r) {
   return Array(getCols(r)).fill(null);
 }
@@ -110,6 +136,7 @@ function randomRowColor() {
 
 function fillInitialRows(count = 5) {
   grid = [];
+  cellPhysics = {};
   for (let r = 0; r < MAX_ROWS; r++) {
     const row = createEmptyRow(r);
     if (r < count) {
@@ -154,6 +181,7 @@ function loadState() {
   shotsLeft = data.shotsLeft || SHOTS_PER_DROP;
   rowOffset = data.rowOffset || 0;
   grid = data.grid;
+  cellPhysics = {};
   currentColor = data.currentColor ?? pickColor();
   nextColor = data.nextColor ?? pickColor();
   gameOver = false;
@@ -199,6 +227,17 @@ function addNewRowAtTop() {
   const newRow = Array(getCols(0)).fill(null).map(() => randomRowColor());
   grid.unshift(newRow);
   grid.pop();
+  cellPhysics = {};
+
+  // Мягкое сотрясение всех шаров при опускании ряда
+  for (let r = 0; r < MAX_ROWS; r++) {
+    for (let c = 0; c < grid[r].length; c++) {
+      if (grid[r][c] !== null) {
+        triggerJelly(r, c, 0.14, 0, -8);
+      }
+    }
+  }
+  SoundFX.playSquelch();
 }
 
 function checkGameOver() {
@@ -224,7 +263,6 @@ function checkBoardCleared() {
       if (grid[r][c] !== null) return false;
     }
   }
-  // Бесконечная игра без уровней: очистил поле — получил бонус и новые ряды
   score += 500;
   shotsLeft = SHOTS_PER_DROP;
   fillInitialRows(5);
@@ -256,9 +294,19 @@ function snapBullet() {
   }
 
   const [r, c] = bestCell;
+  const targetCenter = getCellCenter(r, c);
+  const dx = bullet.x - targetCenter.x;
+  const dy = bullet.y - targetCenter.y;
+  const ivx = bullet.vx;
+  const ivy = bullet.vy;
   const color = bullet.color;
+
   grid[r][c] = color;
   bullet = null;
+
+  // Скользящее вплывание в ячейку + желейная волна по соседям
+  triggerJelly(r, c, 0.34, dx, dy);
+  rippleNeighbors(r, c, ivx, ivy);
 
   // Поиск группы одного цвета
   const visited = new Set([`${r},${c}`]);
@@ -278,14 +326,16 @@ function snapBullet() {
   }
 
   if (cluster.length >= 3) {
-    for (const [cr, cc] of cluster) {
+    cluster.forEach(([cr, cc], idx) => {
       const pos = getCellCenter(cr, cc);
       spawnParticles(pos.x, pos.y, grid[cr][cc]);
       grid[cr][cc] = null;
-    }
+      delete cellPhysics[`${cr},${cc}`];
+      SoundFX.playPop(idx);
+    });
     score += cluster.length * 10;
 
-    // Поиск оторвавшихся шаров (любых цветов), которые не держатся за верх
+    // Поиск оторвавшихся шаров любых цветов
     const anchored = new Set();
     const aQueue = [];
     for (let col = 0; col < grid[0].length; col++) {
@@ -311,23 +361,29 @@ function snapBullet() {
       for (let cc = 0; cc < grid[rr].length; cc++) {
         if (grid[rr][cc] !== null && !anchored.has(`${rr},${cc}`)) {
           const pos = getCellCenter(rr, cc);
-          // Отправляем шар в красивое падение вниз с плавным исчезновением
           fallingBubbles.push({
             x: pos.x,
             y: pos.y,
-            vx: (Math.random() - 0.5) * 3.2,
-            vy: -2.2 - Math.random() * 2.2,
+            vx: (Math.random() - 0.5) * 3.4,
+            vy: -2.4 - Math.random() * 2.2,
             color: grid[rr][cc],
             alpha: 1,
-            scale: 1
+            scale: 1,
+            wobblePhase: Math.random() * Math.PI * 2
           });
           grid[rr][cc] = null;
+          delete cellPhysics[`${rr},${cc}`];
           dropped++;
         }
       }
     }
-    score += dropped * 20;
+
+    if (dropped > 0) {
+      score += dropped * 20;
+      SoundFX.playDrop();
+    }
   } else {
+    SoundFX.playSquelch();
     shotsLeft--;
     if (shotsLeft <= 0) {
       addNewRowAtTop();
@@ -349,7 +405,6 @@ function snapBullet() {
 }
 
 function update() {
-  // Движение фоновых пузырьков
   for (const b of ambientBubbles) {
     b.y -= b.speed;
     b.drift += 0.015;
@@ -360,16 +415,54 @@ function update() {
     }
   }
 
+  // Пружинная физика скольжения и желейной тряски в сетке
+  for (const key in cellPhysics) {
+    const p = cellPhysics[key];
+
+    // Скользящее возвращение в центр ячейки (пружина с мягким затуханием)
+    p.ovx += -p.ox * 0.24;
+    p.ovy += -p.oy * 0.24;
+    p.ovx *= 0.72;
+    p.ovy *= 0.72;
+    p.ox += p.ovx;
+    p.oy += p.ovy;
+
+    // Желейное сжатие/растяжение
+    p.wv += -p.wobble * 0.28;
+    p.wv *= 0.8;
+    p.wobble += p.wv;
+
+    if (
+      Math.abs(p.ox) < 0.05 &&
+      Math.abs(p.oy) < 0.05 &&
+      Math.abs(p.ovx) < 0.05 &&
+      Math.abs(p.ovy) < 0.05 &&
+      Math.abs(p.wobble) < 0.002 &&
+      Math.abs(p.wv) < 0.002
+    ) {
+      delete cellPhysics[key];
+    }
+  }
+
   if (bullet) {
     bullet.x += bullet.vx;
     bullet.y += bullet.vy;
 
+    // Затухание желейной тряски самой пули после отскока
+    bullet.wv += -bullet.wobble * 0.3;
+    bullet.wv *= 0.78;
+    bullet.wobble += bullet.wv;
+
     if (bullet.x - R <= 0) {
       bullet.x = R;
       bullet.vx *= -1;
+      bullet.wv += 0.32;
+      SoundFX.playBounce();
     } else if (bullet.x + R >= W) {
       bullet.x = W - R;
       bullet.vx *= -1;
+      bullet.wv += 0.32;
+      SoundFX.playBounce();
     }
 
     let collided = bullet.y - R <= 0;
@@ -389,21 +482,21 @@ function update() {
     if (collided) snapBullet();
   }
 
-  // Анимация падающих оторвавшихся шариков
+  // Падающие желейные шарики
   for (let i = fallingBubbles.length - 1; i >= 0; i--) {
     const fb = fallingBubbles[i];
     fb.x += fb.vx;
     fb.y += fb.vy;
-    fb.vy += 0.42; // гравитация
+    fb.vy += 0.42;
     fb.alpha -= 0.016;
     fb.scale = Math.max(0.5, fb.scale - 0.005);
+    fb.wobblePhase += 0.25;
 
     if (fb.alpha <= 0 || fb.y - R > H + 40) {
       fallingBubbles.splice(i, 1);
     }
   }
 
-  // Частицы лопанья
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     p.x += p.vx;
@@ -422,14 +515,12 @@ function drawCanvasBackground() {
   ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, W, H);
 
-  // Мягкое солнечное сияние сверху
   const sun = ctx.createRadialGradient(W * 0.25, 0, 10, W * 0.25, 0, 260);
   sun.addColorStop(0, "rgba(255, 255, 255, 0.75)");
   sun.addColorStop(1, "rgba(255, 255, 255, 0)");
   ctx.fillStyle = sun;
   ctx.fillRect(0, 0, W, H);
 
-  // Парящие мыльные пузырьки
   for (const b of ambientBubbles) {
     ctx.save();
     ctx.beginPath();
@@ -454,25 +545,28 @@ function drawCanvasBackground() {
   }
 }
 
-// Желейный глянцевый шарик
-function drawJellyBubble(x, y, colorIdx, radius = R, alpha = 1) {
+// Желейный шарик с поддержкой squash & stretch (scaleX, scaleY, rotation)
+function drawJellyBubble(x, y, colorIdx, radius = R, alpha = 1, sx = 1, sy = 1, rot = 0) {
   const c = COLORS[colorIdx];
   ctx.save();
   ctx.globalAlpha = Math.max(0, alpha);
+  ctx.translate(x, y);
+  if (rot !== 0) ctx.rotate(rot);
+  ctx.scale(sx, sy);
 
-  // Мягкая тень под шариком
+  // Мягкая тень
   ctx.beginPath();
-  ctx.arc(x, y + 2, radius - 1, 0, Math.PI * 2);
+  ctx.arc(0, 2, radius - 1, 0, Math.PI * 2);
   ctx.fillStyle = "rgba(0, 65, 110, 0.16)";
   ctx.fill();
 
-  // Основное полупрозрачное желейное тело
+  // Основное желейное тело
   const bodyGrad = ctx.createRadialGradient(
-    x - radius * 0.25,
-    y - radius * 0.3,
+    -radius * 0.25,
+    -radius * 0.3,
     radius * 0.15,
-    x,
-    y,
+    0,
+    0,
     radius
   );
   bodyGrad.addColorStop(0, c.glow);
@@ -480,52 +574,44 @@ function drawJellyBubble(x, y, colorIdx, radius = R, alpha = 1) {
   bodyGrad.addColorStop(1, c.deep);
 
   ctx.beginPath();
-  ctx.arc(x, y, radius - 1.2, 0, Math.PI * 2);
+  ctx.arc(0, 0, radius - 1.2, 0, Math.PI * 2);
   ctx.fillStyle = bodyGrad;
   ctx.fill();
 
-  // Внутреннее нижнее свечение (эффект просвечивающего желе)
+  // Внутреннее просвечивание снизу
   const bounceGrad = ctx.createRadialGradient(
-    x + radius * 0.2,
-    y + radius * 0.45,
+    radius * 0.2,
+    radius * 0.45,
     1,
-    x + radius * 0.2,
-    y + radius * 0.45,
+    radius * 0.2,
+    radius * 0.45,
     radius * 0.7
   );
   bounceGrad.addColorStop(0, "rgba(255, 255, 255, 0.65)");
   bounceGrad.addColorStop(1, "rgba(255, 255, 255, 0)");
   ctx.beginPath();
-  ctx.arc(x, y, radius - 1.5, 0, Math.PI * 2);
+  ctx.arc(0, 0, radius - 1.5, 0, Math.PI * 2);
   ctx.fillStyle = bounceGrad;
   ctx.fill();
 
-  // Крупный глянцевый верхний блик (Aqua / Jelly shine)
+  // Глянцевый верхний блик
   ctx.beginPath();
-  ctx.ellipse(
-    x,
-    y - radius * 0.38,
-    radius * 0.56,
-    radius * 0.32,
-    0,
-    0,
-    Math.PI * 2
-  );
-  const shineGrad = ctx.createLinearGradient(x, y - radius * 0.72, x, y);
+  ctx.ellipse(0, -radius * 0.38, radius * 0.56, radius * 0.32, 0, 0, Math.PI * 2);
+  const shineGrad = ctx.createLinearGradient(0, -radius * 0.72, 0, 0);
   shineGrad.addColorStop(0, "rgba(255, 255, 255, 0.9)");
   shineGrad.addColorStop(1, "rgba(255, 255, 255, 0.05)");
   ctx.fillStyle = shineGrad;
   ctx.fill();
 
-  // Маленькая яркая точка-блик
+  // Яркая точка-блик
   ctx.beginPath();
-  ctx.arc(x - radius * 0.34, y - radius * 0.34, radius * 0.13, 0, Math.PI * 2);
+  ctx.arc(-radius * 0.34, -radius * 0.34, radius * 0.13, 0, Math.PI * 2);
   ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
   ctx.fill();
 
   // Стеклянная каёмка
   ctx.beginPath();
-  ctx.arc(x, y, radius - 1.2, 0, Math.PI * 2);
+  ctx.arc(0, 0, radius - 1.2, 0, Math.PI * 2);
   ctx.lineWidth = 1.2;
   ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
   ctx.stroke();
@@ -562,7 +648,6 @@ function drawAimLine() {
 }
 
 function drawCannon() {
-  // Ствол в глянцевом серебристо-голубом стиле
   ctx.save();
   ctx.translate(CANNON_X, CANNON_Y);
   ctx.rotate(aimAngle + Math.PI / 2);
@@ -579,7 +664,6 @@ function drawCannon() {
   ctx.stroke();
   ctx.restore();
 
-  // Основание пушки
   const baseGrad = ctx.createRadialGradient(
     CANNON_X - 8,
     CANNON_Y - 10,
@@ -605,7 +689,6 @@ function draw() {
   ctx.clearRect(0, 0, W, H);
   drawCanvasBackground();
 
-  // Линия границы
   ctx.save();
   ctx.strokeStyle = "rgba(255, 70, 120, 0.45)";
   ctx.lineWidth = 2;
@@ -616,25 +699,29 @@ function draw() {
   ctx.stroke();
   ctx.restore();
 
-  // Сетка шаров
+  // Сетка шаров с желейным сжатием и скольжением
   for (let r = 0; r < MAX_ROWS; r++) {
     for (let c = 0; c < grid[r].length; c++) {
       if (grid[r][c] !== null) {
         const pos = getCellCenter(r, c);
-        drawJellyBubble(pos.x, pos.y, grid[r][c]);
+        const p = cellPhysics[`${r},${c}`];
+        const ox = p ? p.ox : 0;
+        const oy = p ? p.oy : 0;
+        const w = p ? p.wobble : 0;
+        drawJellyBubble(pos.x + ox, pos.y + oy, grid[r][c], R, 1, 1 + w, 1 - w, 0);
       }
     }
   }
 
-  // Падающие оторвавшиеся шарики
+  // Падающие шарики слегка колышутся в полёте
   for (const fb of fallingBubbles) {
-    drawJellyBubble(fb.x, fb.y, fb.color, R * fb.scale, fb.alpha);
+    const w = Math.sin(fb.wobblePhase) * 0.1;
+    drawJellyBubble(fb.x, fb.y, fb.color, R * fb.scale, fb.alpha, 1 + w, 1 - w, 0);
   }
 
   drawAimLine();
   drawCannon();
 
-  // Текущий и следующий шарики
   if (!bullet) {
     drawJellyBubble(CANNON_X, CANNON_Y, currentColor, R - 2);
   }
@@ -643,11 +730,14 @@ function draw() {
   ctx.fillText("След.:", CANNON_X + 46, CANNON_Y + 4);
   drawJellyBubble(CANNON_X + 98, CANNON_Y, nextColor, 14);
 
+  // Летящий шарик слегка вытягивается по направлению движения
   if (bullet) {
-    drawJellyBubble(bullet.x, bullet.y, bullet.color);
+    const moveAngle = Math.atan2(bullet.vy, bullet.vx);
+    const sx = 1.09 + bullet.wobble;
+    const sy = 0.91 - bullet.wobble;
+    drawJellyBubble(bullet.x, bullet.y, bullet.color, R, 1, sx, sy, moveAngle);
   }
 
-  // Частицы лопанья
   for (const p of particles) {
     ctx.save();
     ctx.globalAlpha = Math.max(0, p.life);
@@ -676,10 +766,13 @@ function shoot() {
     y: CANNON_Y,
     vx: Math.cos(aimAngle) * SHOT_SPEED,
     vy: Math.sin(aimAngle) * SHOT_SPEED,
-    color: currentColor
+    color: currentColor,
+    wobble: 0,
+    wv: 0.18
   };
   currentColor = nextColor;
   nextColor = pickColor();
+  SoundFX.playShoot();
 }
 
 canvas.addEventListener("pointermove", setAimFromPointer);
@@ -690,6 +783,12 @@ canvas.addEventListener("pointerdown", (e) => {
 
 resetBtn.addEventListener("click", startNewGame);
 playAgainBtn.addEventListener("click", startNewGame);
+
+musicBtn.addEventListener("click", async () => {
+  const isOn = await BgMusic.toggle();
+  musicBtn.textContent = isOn ? "🎵 Вкл" : "🎵 Выкл";
+  musicBtn.classList.toggle("is-on", isOn);
+});
 
 if (!loadState()) {
   startNewGame();
