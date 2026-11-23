@@ -16,14 +16,12 @@ body {
   color: #0b3c5d;
   overflow-x: hidden;
   position: relative;
-  /* Классический фон Frutiger Aero: небо -> бирюза -> сочная зелень */
   background:
     radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0) 38%),
     radial-gradient(ellipse at 50% 108%, #63e05c 0%, #37c871 26%, rgba(55, 200, 113, 0) 58%),
     linear-gradient(180deg, #1b9cfc 0%, #57d6ff 48%, #b9f3fc 76%, #9ef0a2 100%);
 }
 
-/* Декоративные глянцевые пузыри на фоне */
 .bg-orb {
   position: fixed;
   border-radius: 50%;
@@ -43,7 +41,6 @@ body {
 .orb-2 { width: 110px; height: 110px; bottom: 14%; right: 8%; }
 .orb-3 { width: 70px; height: 70px; top: 24%; right: 14%; }
 
-/* Верхняя стеклянная панель (Aero Glass) */
 .hud {
   position: relative;
   z-index: 1;
@@ -52,9 +49,9 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 12px;
-  padding: 10px 16px;
+  padding: 10px 14px;
   border-radius: 20px;
   background: linear-gradient(
     180deg,
@@ -69,28 +66,32 @@ body {
   backdrop-filter: blur(12px);
 }
 
+.hud-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .stat {
   display: flex;
   flex-direction: column;
   align-items: center;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: #16658a;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .stat strong {
-  font-size: 20px;
+  font-size: 19px;
   color: #06395a;
 }
 
-/* Глянцевая кнопка Aero */
 .btn-aero {
-  position: relative;
   border: 1px solid rgba(255, 255, 255, 0.9);
   border-radius: 999px;
-  padding: 9px 18px;
-  font-size: 14px;
+  padding: 8px 14px;
+  font-size: 13px;
   font-weight: 700;
   color: #ffffff;
   text-shadow: 0 1px 2px rgba(0, 65, 110, 0.55);
@@ -103,7 +104,7 @@ body {
     #2ad4ff 100%
   );
   box-shadow:
-    0 5px 14px rgba(0, 140, 220, 0.38),
+    0 4px 12px rgba(0, 140, 220, 0.35),
     inset 0 1.5px 1px rgba(255, 255, 255, 0.95);
   transition: transform 0.12s ease, filter 0.15s ease;
 }
@@ -114,6 +115,35 @@ body {
 
 .btn-aero:active {
   transform: scale(0.95);
+}
+
+/* Кнопка музыки: стеклянная когда выкл, зелёная когда вкл */
+.btn-music {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.85) 0%,
+    rgba(195, 232, 250, 0.75) 100%
+  );
+  color: #145e82;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+  box-shadow:
+    0 4px 10px rgba(10, 95, 145, 0.18),
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.95);
+}
+
+.btn-music.is-on {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 90, 20, 0.5);
+  background: linear-gradient(
+    180deg,
+    #b6ff8a 0%,
+    #52db47 48%,
+    #25b822 52%,
+    #6de85d 100%
+  );
+  box-shadow:
+    0 4px 14px rgba(34, 170, 34, 0.38),
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.95);
 }
 
 .btn-green {
@@ -131,7 +161,6 @@ body {
     inset 0 1.5px 1px rgba(255, 255, 255, 0.95);
 }
 
-/* Окно игры */
 .game-wrap {
   position: relative;
   z-index: 1;
