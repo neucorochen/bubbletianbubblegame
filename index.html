@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bubble Shooter</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="hud">
+    <div class="stat"><span>Очки</span><strong id="scoreEl">0</strong></div>
+    <div class="stat"><span>Рекорд</span><strong id="bestEl">0</strong></div>
+    <div class="stat"><span>Уровень</span><strong id="levelEl">1</strong></div>
+    <div class="stat"><span>До сдвига</span><strong id="dropEl">6</strong></div>
+    <button class="btn-reset" id="resetBtn">Заново</button>
+  </div>
+
+  <div class="game-wrap">
+    <canvas id="game" width="480" height="660"></canvas>
+    <div class="overlay" id="gameOverOverlay">
+      <h2>Игра окончена</h2>
+      <p id="finalScoreText">Очки: 0</p>
+      <button id="playAgainBtn">Играть снова</button>
+    </div>
+  </div>
+
+  <!-- Важно: storage.js подключается раньше game.js -->
+  <script src="storage.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
