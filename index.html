@@ -15,7 +15,10 @@
     <div class="stat"><span>Очки</span><strong id="scoreEl">0</strong></div>
     <div class="stat"><span>Рекорд</span><strong id="bestEl">0</strong></div>
     <div class="stat"><span>До сдвига</span><strong id="dropEl">6</strong></div>
-    <button class="btn-aero" id="resetBtn">Заново</button>
+    <div class="hud-actions">
+      <button class="btn-aero btn-music" id="musicBtn" title="Фоновая музыка">🎵 Выкл</button>
+      <button class="btn-aero" id="resetBtn">Заново</button>
+    </div>
   </div>
 
   <div class="game-wrap">
@@ -30,6 +33,7 @@
   </div>
 
   <script src="storage.js"></script>
+  <script src="audio.js"></script>
   <script src="game.js"></script>
 </body>
 </html>
