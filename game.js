@@ -26,14 +26,152 @@ const NEXT_Y = CANNON_Y;
 const SHOT_SPEED = 14.5;
 const SHOTS_PER_DROP = 6;
 
+// Фруктовая мармеладная палитра (сочная, полупрозрачная, с тёплым свечением)
 const COLORS = [
-  { main: "#ff3b7f", glow: "#ff9ec4", deep: "#b8004c" }, // малиновый
-  { main: "#00b4ff", glow: "#a3ecff", deep: "#005fa3" }, // аквамарин
-  { main: "#3be33b", glow: "#c2ff9e", deep: "#0f8a1e" }, // лайм
-  { main: "#ffb703", glow: "#fff099", deep: "#c96a00" }, // манго
-  { main: "#a663ff", glow: "#e3ccff", deep: "#581c9c" }, // виноград
-  { main: "#00e5c3", glow: "#b3fff2", deep: "#008272" }  // мята
+  { main: "#ff3366", core: "#ff99b8", rim: "#b50038", tint: "rgba(255, 190, 210, 0.75)" }, // клубничный
+  { main: "#0099ff", core: "#8ee6ff", rim: "#004e9e", tint: "rgba(180, 240, 255, 0.75)" }, // голубичный
+  { main: "#34d62e", core: "#c2ff85", rim: "#0f7a18", tint: "rgba(215, 255, 180, 0.75)" }, // яблочный
+  { main: "#ff9900", core: "#ffe67a", rim: "#bd4f00", tint: "rgba(255, 240, 175, 0.75)" }, // апельсиновый
+  { main: "#9c4dff", core: "#e0b8ff", rim: "#4d1199", tint: "rgba(232, 205, 255, 0.75)" }, // виноградный
+  { main: "#00d4b0", core: "#a8fff0", rim: "#007362", tint: "rgba(195, 255, 245, 0.75)" }  // мятный
 ];
+
+// --- ОПТИМИЗАЦИЯ: предрендер спрайтов (рисуем один раз при старте) ---
+const SPRITE_SIZE = 96;
+const bubbleSprites = [];
+let ambientSprite = null;
+let bgCanvas = null;
+
+function createGummySprite(colorObj) {
+  const c = document.createElement("canvas");
+  c.width = SPRITE_SIZE;
+  c.height = SPRITE_SIZE;
+  const g = c.getContext("2d");
+  const cx = SPRITE_SIZE / 2;
+  const cy = SPRITE_SIZE / 2;
+  const rad = 40;
+
+  // 1. Мягкая цветная тень (как от полупрозрачного мармелада)
+  g.save();
+  g.beginPath();
+  g.arc(cx, cy + 4, rad, 0, Math.PI * 2);
+  g.fillStyle = colorObj.rim;
+  g.globalAlpha = 0.22;
+  g.fill();
+  g.restore();
+
+  // 2. Основное полупрозрачное мармеладное тело
+  g.save();
+  g.beginPath();
+  g.arc(cx, cy, rad, 0, Math.PI * 2);
+  g.clip();
+
+  const baseGrad = g.createRadialGradient(cx, cy - rad * 0.2, rad * 0.1, cx, cy, rad);
+  baseGrad.addColorStop(0, colorObj.core);
+  baseGrad.addColorStop(0.55, colorObj.main);
+  baseGrad.addColorStop(1, colorObj.rim);
+  g.fillStyle = baseGrad;
+  g.fillRect(0, 0, SPRITE_SIZE, SPRITE_SIZE);
+
+  // 3. Эффект просвечивания света снизу (subsurface scattering)
+  const subGrad = g.createRadialGradient(
+    cx,
+    cy + rad * 0.55,
+    rad * 0.05,
+    cx,
+    cy + rad * 0.45,
+    rad * 0.78
+  );
+  subGrad.addColorStop(0, colorObj.tint);
+  subGrad.addColorStop(0.55, colorObj.core);
+  subGrad.addColorStop(1, "rgba(255, 255, 255, 0)");
+  g.globalAlpha = 0.75;
+  g.fillStyle = subGrad;
+  g.fillRect(0, 0, SPRITE_SIZE, SPRITE_SIZE);
+
+  // 4. Мягкое внутреннее затенение сверху по краю для объёма
+  g.globalAlpha = 1;
+  const innerRim = g.createRadialGradient(cx, cy + rad * 0.1, rad * 0.62, cx, cy, rad);
+  innerRim.addColorStop(0, "rgba(255, 255, 255, 0)");
+  innerRim.addColorStop(0.85, "rgba(255, 255, 255, 0.15)");
+  innerRim.addColorStop(1, "rgba(255, 255, 255, 0.55)");
+  g.fillStyle = innerRim;
+  g.fillRect(0, 0, SPRITE_SIZE, SPRITE_SIZE);
+
+  // 5. Глянцевый влажный верхний блик (форма фасолины)
+  g.beginPath();
+  g.ellipse(cx - rad * 0.05, cy - rad * 0.42, rad * 0.54, rad * 0.28, -0.1, 0, Math.PI * 2);
+  const topShine = g.createLinearGradient(cx, cy - rad * 0.72, cx, cy - rad * 0.12);
+  topShine.addColorStop(0, "rgba(255, 255, 255, 0.92)");
+  topShine.addColorStop(0.65, "rgba(255, 255, 255, 0.25)");
+  topShine.addColorStop(1, "rgba(255, 255, 255, 0)");
+  g.fillStyle = topShine;
+  g.fill();
+
+  // 6. Маленькая яркая «мокрая» искра-блик
+  g.beginPath();
+  g.ellipse(cx - rad * 0.36, cy - rad * 0.36, rad * 0.16, rad * 0.1, -0.6, 0, Math.PI * 2);
+  g.fillStyle = "rgba(255, 255, 255, 0.98)";
+  g.fill();
+
+  // 7. Тонкий нижний рефлекс
+  g.beginPath();
+  g.ellipse(cx + rad * 0.18, cy + rad * 0.62, rad * 0.32, rad * 0.1, -0.2, 0, Math.PI * 2);
+  g.fillStyle = "rgba(255, 255, 255, 0.45)";
+  g.fill();
+
+  g.restore();
+
+  // 8. Аккуратная стеклянная кромка
+  g.beginPath();
+  g.arc(cx, cy, rad - 0.5, 0, Math.PI * 2);
+  g.lineWidth = 1.6;
+  g.strokeStyle = "rgba(255, 255, 255, 0.52)";
+  g.stroke();
+
+  return c;
+}
+
+function initCachedSprites() {
+  for (let i = 0; i < COLORS.length; i++) {
+    bubbleSprites.push(createGummySprite(COLORS[i]));
+  }
+
+  // Спрайт фонового мыльного пузырька
+  ambientSprite = document.createElement("canvas");
+  ambientSprite.width = 64;
+  ambientSprite.height = 64;
+  const ag = ambientSprite.getContext("2d");
+  const grad = ag.createRadialGradient(22, 22, 2, 32, 32, 28);
+  grad.addColorStop(0, "rgba(255, 255, 255, 0.75)");
+  grad.addColorStop(0.7, "rgba(255, 255, 255, 0.12)");
+  grad.addColorStop(1, "rgba(120, 215, 255, 0.32)");
+  ag.beginPath();
+  ag.arc(32, 32, 28, 0, Math.PI * 2);
+  ag.fillStyle = grad;
+  ag.fill();
+  ag.lineWidth = 1.5;
+  ag.strokeStyle = "rgba(255, 255, 255, 0.6)";
+  ag.stroke();
+
+  // Предрендер статичного фона игрового поля
+  bgCanvas = document.createElement("canvas");
+  bgCanvas.width = W;
+  bgCanvas.height = H;
+  const bg = bgCanvas.getContext("2d");
+  const bgGrad = bg.createLinearGradient(0, 0, 0, H);
+  bgGrad.addColorStop(0, "#d9f3ff");
+  bgGrad.addColorStop(0.6, "#ebf9ff");
+  bgGrad.addColorStop(1, "#d3f5ec");
+  bg.fillStyle = bgGrad;
+  bg.fillRect(0, 0, W, H);
+
+  const sun = bg.createRadialGradient(W * 0.22, 0, 10, W * 0.22, 0, 260);
+  sun.addColorStop(0, "rgba(255, 255, 255, 0.85)");
+  sun.addColorStop(1, "rgba(255, 255, 255, 0)");
+  bg.fillStyle = sun;
+  bg.fillRect(0, 0, W, H);
+}
 
 let grid = [];
 let cellPhysics = {};
@@ -49,12 +187,13 @@ let bullet = null;
 let particles = [];
 let fallingBubbles = [];
 let gameOver = false;
+let isRefilling = false;
 
-const ambientBubbles = Array.from({ length: 14 }, () => ({
+const ambientBubbles = Array.from({ length: 10 }, () => ({
   x: Math.random() * W,
   y: Math.random() * H,
-  r: 8 + Math.random() * 18,
-  speed: 0.25 + Math.random() * 0.45,
+  r: 10 + Math.random() * 16,
+  speed: 0.25 + Math.random() * 0.4,
   drift: Math.random() * Math.PI * 2
 }));
 
@@ -137,7 +276,8 @@ function randomRowColor() {
   return Math.floor(Math.random() * COLORS.length);
 }
 
-function fillInitialRows(count = 5) {
+// Плавное заполнение поля сверху вниз
+function fillInitialRows(count = 5, animate = true) {
   grid = [];
   cellPhysics = {};
   for (let r = 0; r < MAX_ROWS; r++) {
@@ -145,9 +285,26 @@ function fillInitialRows(count = 5) {
     if (r < count) {
       for (let c = 0; c < row.length; c++) {
         row[c] = randomRowColor();
+        if (animate) {
+          // Стартуют выше экрана с небольшой задержкой по рядам и столбцам
+          const startOffsetY = -(count * ROW_H + 55) - (count - r) * 18 - c * 4;
+          cellPhysics[`${r},${c}`] = {
+            ox: 0,
+            oy: startOffsetY,
+            ovx: 0,
+            ovy: 0,
+            wobble: 0,
+            wv: 0.12,
+            slidingIn: true
+          };
+        }
       }
     }
     grid.push(row);
+  }
+  if (animate) {
+    isRefilling = true;
+    SoundFX.playSquelch();
   }
 }
 
@@ -202,16 +359,15 @@ function startNewGame() {
   fallingBubbles = [];
   gameOver = false;
   gameOverOverlay.classList.remove("show");
-  fillInitialRows(5);
+  fillInitialRows(5, true);
   currentColor = pickColor();
   nextColor = pickColor();
   updateHUD();
   saveState();
 }
 
-// Смена текущего и следующего шарика местами
 function swapBubbles() {
-  if (bullet || gameOver) return;
+  if (bullet || gameOver || isRefilling) return;
   const tmp = currentColor;
   currentColor = nextColor;
   nextColor = tmp;
@@ -222,16 +378,16 @@ function swapBubbles() {
 
 function spawnParticles(x, y, colorIdx) {
   const col = COLORS[colorIdx];
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < 7; i++) {
     const a = Math.random() * Math.PI * 2;
-    const sp = 1.6 + Math.random() * 3.8;
+    const sp = 1.6 + Math.random() * 3.6;
     particles.push({
       x,
       y,
       vx: Math.cos(a) * sp,
       vy: Math.sin(a) * sp,
-      r: 3 + Math.random() * 4.5,
-      color: i % 2 === 0 ? col.main : col.glow,
+      r: 3 + Math.random() * 4,
+      color: i % 2 === 0 ? col.main : col.core,
       life: 1
     });
   }
@@ -247,7 +403,7 @@ function addNewRowAtTop() {
   for (let r = 0; r < MAX_ROWS; r++) {
     for (let c = 0; c < grid[r].length; c++) {
       if (grid[r][c] !== null) {
-        triggerJelly(r, c, 0.14, 0, -8);
+        triggerJelly(r, c, 0.14, 0, -ROW_H * 0.75);
       }
     }
   }
@@ -279,7 +435,7 @@ function checkBoardCleared() {
   }
   score += 500;
   shotsLeft = SHOTS_PER_DROP;
-  fillInitialRows(5);
+  fillInitialRows(5, true);
   return true;
 }
 
@@ -428,20 +584,35 @@ function update() {
     }
   }
 
+  let anySliding = false;
   for (const key in cellPhysics) {
     const p = cellPhysics[key];
-    p.ovx += -p.ox * 0.24;
-    p.ovy += -p.oy * 0.24;
-    p.ovx *= 0.72;
-    p.ovy *= 0.72;
-    p.ox += p.ovx;
-    p.oy += p.ovy;
+
+    if (p.slidingIn) {
+      // Плавное скольжение сверху при заполнении поля
+      p.oy *= 0.84;
+      if (Math.abs(p.oy) < 1.5) {
+        p.oy = 0;
+        p.slidingIn = false;
+        p.wv += 0.16; // мягкий желейный отскок при приземлении
+      } else {
+        anySliding = true;
+      }
+    } else {
+      p.ovx += -p.ox * 0.24;
+      p.ovy += -p.oy * 0.24;
+      p.ovx *= 0.72;
+      p.ovy *= 0.72;
+      p.ox += p.ovx;
+      p.oy += p.ovy;
+    }
 
     p.wv += -p.wobble * 0.28;
     p.wv *= 0.8;
     p.wobble += p.wv;
 
     if (
+      !p.slidingIn &&
       Math.abs(p.ox) < 0.05 &&
       Math.abs(p.oy) < 0.05 &&
       Math.abs(p.ovx) < 0.05 &&
@@ -452,6 +623,7 @@ function update() {
       delete cellPhysics[key];
     }
   }
+  isRefilling = anySliding;
 
   if (bullet) {
     bullet.x += bullet.vx;
@@ -514,125 +686,34 @@ function update() {
   }
 }
 
-function drawCanvasBackground() {
-  const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
-  bgGrad.addColorStop(0, "#d9f3ff");
-  bgGrad.addColorStop(0.6, "#ebf9ff");
-  bgGrad.addColorStop(1, "#d3f5ec");
-  ctx.fillStyle = bgGrad;
-  ctx.fillRect(0, 0, W, H);
+// Быстрая отрисовка мармеладного шарика из кэша
+function drawGummyBubble(x, y, colorIdx, radius = R, alpha = 1, sx = 1, sy = 1, rot = 0) {
+  const sprite = bubbleSprites[colorIdx];
+  if (!sprite) return;
+  const drawSize = radius * 2.4;
 
-  const sun = ctx.createRadialGradient(W * 0.22, 0, 10, W * 0.22, 0, 260);
-  sun.addColorStop(0, "rgba(255, 255, 255, 0.85)");
-  sun.addColorStop(1, "rgba(255, 255, 255, 0)");
-  ctx.fillStyle = sun;
-  ctx.fillRect(0, 0, W, H);
-
-  for (const b of ambientBubbles) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-    const g = ctx.createRadialGradient(
-      b.x - b.r * 0.3,
-      b.y - b.r * 0.3,
-      1,
-      b.x,
-      b.y,
-      b.r
-    );
-    g.addColorStop(0, "rgba(255, 255, 255, 0.7)");
-    g.addColorStop(0.7, "rgba(255, 255, 255, 0.14)");
-    g.addColorStop(1, "rgba(120, 215, 255, 0.28)");
-    ctx.fillStyle = g;
-    ctx.fill();
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
-    ctx.stroke();
-    ctx.restore();
-  }
-}
-
-function drawJellyBubble(x, y, colorIdx, radius = R, alpha = 1, sx = 1, sy = 1, rot = 0) {
-  const c = COLORS[colorIdx];
   ctx.save();
-  ctx.globalAlpha = Math.max(0, alpha);
+  if (alpha < 1) ctx.globalAlpha = Math.max(0, alpha);
   ctx.translate(x, y);
   if (rot !== 0) ctx.rotate(rot);
-  ctx.scale(sx, sy);
-
-  ctx.beginPath();
-  ctx.arc(0, 2, radius - 1, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(0, 65, 110, 0.16)";
-  ctx.fill();
-
-  const bodyGrad = ctx.createRadialGradient(
-    -radius * 0.25,
-    -radius * 0.3,
-    radius * 0.15,
-    0,
-    0,
-    radius
-  );
-  bodyGrad.addColorStop(0, c.glow);
-  bodyGrad.addColorStop(0.55, c.main);
-  bodyGrad.addColorStop(1, c.deep);
-
-  ctx.beginPath();
-  ctx.arc(0, 0, radius - 1.2, 0, Math.PI * 2);
-  ctx.fillStyle = bodyGrad;
-  ctx.fill();
-
-  const bounceGrad = ctx.createRadialGradient(
-    radius * 0.2,
-    radius * 0.45,
-    1,
-    radius * 0.2,
-    radius * 0.45,
-    radius * 0.7
-  );
-  bounceGrad.addColorStop(0, "rgba(255, 255, 255, 0.65)");
-  bounceGrad.addColorStop(1, "rgba(255, 255, 255, 0)");
-  ctx.beginPath();
-  ctx.arc(0, 0, radius - 1.5, 0, Math.PI * 2);
-  ctx.fillStyle = bounceGrad;
-  ctx.fill();
-
-  ctx.beginPath();
-  ctx.ellipse(0, -radius * 0.38, radius * 0.56, radius * 0.32, 0, 0, Math.PI * 2);
-  const shineGrad = ctx.createLinearGradient(0, -radius * 0.72, 0, 0);
-  shineGrad.addColorStop(0, "rgba(255, 255, 255, 0.9)");
-  shineGrad.addColorStop(1, "rgba(255, 255, 255, 0.05)");
-  ctx.fillStyle = shineGrad;
-  ctx.fill();
-
-  ctx.beginPath();
-  ctx.arc(-radius * 0.34, -radius * 0.34, radius * 0.13, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
-  ctx.fill();
-
-  ctx.beginPath();
-  ctx.arc(0, 0, radius - 1.2, 0, Math.PI * 2);
-  ctx.lineWidth = 1.2;
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
-  ctx.stroke();
-
+  if (sx !== 1 || sy !== 1) ctx.scale(sx, sy);
+  ctx.drawImage(sprite, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
   ctx.restore();
 }
 
-// Точная траектория полёта с отскоками от стен и точкой попадания
 function drawAimLine() {
-  if (bullet || gameOver) return;
+  if (bullet || gameOver || isRefilling) return;
 
   let x = CANNON_X;
   let y = CANNON_Y;
   let vx = Math.cos(aimAngle);
   let vy = Math.sin(aimAngle);
-  const step = 4;
+  const step = 5;
 
   const points = [{ x, y }];
   const bounces = [];
 
-  for (let i = 0; i < 360; i++) {
+  for (let i = 0; i < 280; i++) {
     x += vx * step;
     y += vy * step;
 
@@ -671,7 +752,6 @@ function drawAimLine() {
   const col = COLORS[currentColor].main;
 
   ctx.save();
-  // Белая обводка пунктира для чёткости
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   ctx.setLineDash([7, 9]);
@@ -682,7 +762,6 @@ function drawAimLine() {
   points.forEach((pt, idx) => (idx === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y)));
   ctx.stroke();
 
-  // Цветная линия траектории
   ctx.strokeStyle = col;
   ctx.lineWidth = 2.5;
   ctx.beginPath();
@@ -690,7 +769,6 @@ function drawAimLine() {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Точки отскока от стен
   for (const b of bounces) {
     ctx.beginPath();
     ctx.arc(b.x, b.y, 5, 0, Math.PI * 2);
@@ -701,7 +779,6 @@ function drawAimLine() {
     ctx.stroke();
   }
 
-  // Призрачный контур шарика в конечной точке попадания
   const end = points[points.length - 1];
   ctx.beginPath();
   ctx.arc(end.x, end.y, R - 2, 0, Math.PI * 2);
@@ -754,8 +831,11 @@ function drawCannon() {
 }
 
 function draw() {
-  ctx.clearRect(0, 0, W, H);
-  drawCanvasBackground();
+  ctx.drawImage(bgCanvas, 0, 0);
+
+  for (const b of ambientBubbles) {
+    ctx.drawImage(ambientSprite, b.x - b.r, b.y - b.r, b.r * 2, b.r * 2);
+  }
 
   ctx.save();
   ctx.strokeStyle = "rgba(255, 70, 120, 0.45)";
@@ -775,26 +855,24 @@ function draw() {
         const ox = p ? p.ox : 0;
         const oy = p ? p.oy : 0;
         const w = p ? p.wobble : 0;
-        drawJellyBubble(pos.x + ox, pos.y + oy, grid[r][c], R, 1, 1 + w, 1 - w, 0);
+        drawGummyBubble(pos.x + ox, pos.y + oy, grid[r][c], R, 1, 1 + w, 1 - w, 0);
       }
     }
   }
 
   for (const fb of fallingBubbles) {
     const w = Math.sin(fb.wobblePhase) * 0.1;
-    drawJellyBubble(fb.x, fb.y, fb.color, R * fb.scale, fb.alpha, 1 + w, 1 - w, 0);
+    drawGummyBubble(fb.x, fb.y, fb.color, R * fb.scale, fb.alpha, 1 + w, 1 - w, 0);
   }
 
   drawAimLine();
   drawCannon();
 
-  // Текущий шарик в пушке (с лёгким пружинным эффектом при смене)
   if (!bullet) {
     const s = 1 + Math.sin(swapAnim * Math.PI) * 0.16;
-    drawJellyBubble(CANNON_X, CANNON_Y, currentColor, R - 2, 1, s, 2 - s, 0);
+    drawGummyBubble(CANNON_X, CANNON_Y, currentColor, R - 2, 1, s, 2 - s, 0);
   }
 
-  // Следующий шарик (кликабельный для смены)
   ctx.save();
   ctx.beginPath();
   ctx.arc(NEXT_X, NEXT_Y, 21, 0, Math.PI * 2);
@@ -808,13 +886,13 @@ function draw() {
   ctx.fillStyle = "#0b3a63";
   ctx.font = "italic 700 12px Segoe UI";
   ctx.fillText("след. ⇄", CANNON_X + 34, CANNON_Y + 4);
-  drawJellyBubble(NEXT_X, NEXT_Y, nextColor, 14);
+  drawGummyBubble(NEXT_X, NEXT_Y, nextColor, 14);
 
   if (bullet) {
     const moveAngle = Math.atan2(bullet.vy, bullet.vx);
     const sx = 1.09 + bullet.wobble;
     const sy = 0.91 - bullet.wobble;
-    drawJellyBubble(bullet.x, bullet.y, bullet.color, R, 1, sx, sy, moveAngle);
+    drawGummyBubble(bullet.x, bullet.y, bullet.color, R, 1, sx, sy, moveAngle);
   }
 
   for (const p of particles) {
@@ -845,7 +923,7 @@ function setAimFromPointer(e) {
 }
 
 function shoot() {
-  if (bullet || gameOver) return;
+  if (bullet || gameOver || isRefilling) return;
   bullet = {
     x: CANNON_X,
     y: CANNON_Y,
@@ -860,24 +938,31 @@ function shoot() {
   SoundFX.playShoot();
 }
 
-canvas.addEventListener("pointermove", setAimFromPointer);
+// Глобальное прицеливание и стрельба (даже если курсор вне поля, кроме зоны кнопок)
+window.addEventListener("pointermove", setAimFromPointer);
 
-canvas.addEventListener("pointerdown", (e) => {
+window.addEventListener("pointerdown", (e) => {
+  // Игнорируем клики по любым кнопкам и окну проигрыша
+  if (e.target.closest("button, .overlay-card")) return;
+
   if (e.button === 2) {
     swapBubbles();
     return;
   }
+
   const { x, y } = getCanvasCoords(e);
-  // Клик по кружку со следующим шариком меняет шарики местами вместо выстрела
   if (Math.hypot(x - NEXT_X, y - NEXT_Y) <= 24) {
     swapBubbles();
     return;
   }
+
   setAimFromPointer(e);
   shoot();
 });
 
-canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+window.addEventListener("contextmenu", (e) => {
+  if (!e.target.closest("button")) e.preventDefault();
+});
 
 window.addEventListener("keydown", (e) => {
   if (e.code === "Space") {
@@ -896,6 +981,7 @@ musicBtn.addEventListener("click", async () => {
   musicBtn.classList.toggle("is-on", isOn);
 });
 
+initCachedSprites();
 if (!loadState()) {
   startNewGame();
 }
