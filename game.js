@@ -21,12 +21,11 @@ const DANGER_ROW = 13;
 const DANGER_Y = DANGER_ROW * ROW_H + R;
 const CANNON_X = W / 2;
 const CANNON_Y = H - 48;
-const NEXT_X = CANNON_X + 98;
-const NEXT_Y = CANNON_Y;
+const NEXT_X = CANNON_X + 106;
+const NEXT_Y = CANNON_Y + 4;
 const SHOT_SPEED = 14.5;
 const SHOTS_PER_DROP = 6;
 
-// Фруктовая мармеладная палитра (сочная, полупрозрачная, с тёплым свечением)
 const COLORS = [
   { main: "#ff3366", core: "#ff99b8", rim: "#b50038", tint: "rgba(255, 190, 210, 0.75)" }, // клубничный
   { main: "#0099ff", core: "#8ee6ff", rim: "#004e9e", tint: "rgba(180, 240, 255, 0.75)" }, // голубичный
@@ -36,7 +35,6 @@ const COLORS = [
   { main: "#00d4b0", core: "#a8fff0", rim: "#007362", tint: "rgba(195, 255, 245, 0.75)" }  // мятный
 ];
 
-// --- ОПТИМИЗАЦИЯ: предрендер спрайтов (рисуем один раз при старте) ---
 const SPRITE_SIZE = 96;
 const bubbleSprites = [];
 let ambientSprite = null;
@@ -51,7 +49,6 @@ function createGummySprite(colorObj) {
   const cy = SPRITE_SIZE / 2;
   const rad = 40;
 
-  // 1. Мягкая цветная тень (как от полупрозрачного мармелада)
   g.save();
   g.beginPath();
   g.arc(cx, cy + 4, rad, 0, Math.PI * 2);
@@ -60,7 +57,6 @@ function createGummySprite(colorObj) {
   g.fill();
   g.restore();
 
-  // 2. Основное полупрозрачное мармеладное тело
   g.save();
   g.beginPath();
   g.arc(cx, cy, rad, 0, Math.PI * 2);
@@ -73,7 +69,6 @@ function createGummySprite(colorObj) {
   g.fillStyle = baseGrad;
   g.fillRect(0, 0, SPRITE_SIZE, SPRITE_SIZE);
 
-  // 3. Эффект просвечивания света снизу (subsurface scattering)
   const subGrad = g.createRadialGradient(
     cx,
     cy + rad * 0.55,
@@ -89,7 +84,6 @@ function createGummySprite(colorObj) {
   g.fillStyle = subGrad;
   g.fillRect(0, 0, SPRITE_SIZE, SPRITE_SIZE);
 
-  // 4. Мягкое внутреннее затенение сверху по краю для объёма
   g.globalAlpha = 1;
   const innerRim = g.createRadialGradient(cx, cy + rad * 0.1, rad * 0.62, cx, cy, rad);
   innerRim.addColorStop(0, "rgba(255, 255, 255, 0)");
@@ -98,7 +92,6 @@ function createGummySprite(colorObj) {
   g.fillStyle = innerRim;
   g.fillRect(0, 0, SPRITE_SIZE, SPRITE_SIZE);
 
-  // 5. Глянцевый влажный верхний блик (форма фасолины)
   g.beginPath();
   g.ellipse(cx - rad * 0.05, cy - rad * 0.42, rad * 0.54, rad * 0.28, -0.1, 0, Math.PI * 2);
   const topShine = g.createLinearGradient(cx, cy - rad * 0.72, cx, cy - rad * 0.12);
@@ -108,13 +101,11 @@ function createGummySprite(colorObj) {
   g.fillStyle = topShine;
   g.fill();
 
-  // 6. Маленькая яркая «мокрая» искра-блик
   g.beginPath();
   g.ellipse(cx - rad * 0.36, cy - rad * 0.36, rad * 0.16, rad * 0.1, -0.6, 0, Math.PI * 2);
   g.fillStyle = "rgba(255, 255, 255, 0.98)";
   g.fill();
 
-  // 7. Тонкий нижний рефлекс
   g.beginPath();
   g.ellipse(cx + rad * 0.18, cy + rad * 0.62, rad * 0.32, rad * 0.1, -0.2, 0, Math.PI * 2);
   g.fillStyle = "rgba(255, 255, 255, 0.45)";
@@ -122,7 +113,6 @@ function createGummySprite(colorObj) {
 
   g.restore();
 
-  // 8. Аккуратная стеклянная кромка
   g.beginPath();
   g.arc(cx, cy, rad - 0.5, 0, Math.PI * 2);
   g.lineWidth = 1.6;
@@ -137,7 +127,6 @@ function initCachedSprites() {
     bubbleSprites.push(createGummySprite(COLORS[i]));
   }
 
-  // Спрайт фонового мыльного пузырька
   ambientSprite = document.createElement("canvas");
   ambientSprite.width = 64;
   ambientSprite.height = 64;
@@ -154,7 +143,6 @@ function initCachedSprites() {
   ag.strokeStyle = "rgba(255, 255, 255, 0.6)";
   ag.stroke();
 
-  // Предрендер статичного фона игрового поля
   bgCanvas = document.createElement("canvas");
   bgCanvas.width = W;
   bgCanvas.height = H;
@@ -181,13 +169,21 @@ let bestScore = 0;
 let shotsLeft = SHOTS_PER_DROP;
 let currentColor = 0;
 let nextColor = 1;
-let swapAnim = 0;
 let aimAngle = -Math.PI / 2;
 let bullet = null;
 let particles = [];
 let fallingBubbles = [];
 let gameOver = false;
 let isRefilling = false;
+
+// Желейная физика пушки
+let cannonSquash = 0;
+let cannonSquashV = 0;
+let cannonRecoil = 0;
+let cannonRecoilV = 0;
+
+// Плавное перекидывание текущего и следующего шарика
+let swapTransition = null;
 
 const ambientBubbles = Array.from({ length: 10 }, () => ({
   x: Math.random() * W,
@@ -276,7 +272,6 @@ function randomRowColor() {
   return Math.floor(Math.random() * COLORS.length);
 }
 
-// Плавное заполнение поля сверху вниз
 function fillInitialRows(count = 5, animate = true) {
   grid = [];
   cellPhysics = {};
@@ -286,7 +281,6 @@ function fillInitialRows(count = 5, animate = true) {
       for (let c = 0; c < row.length; c++) {
         row[c] = randomRowColor();
         if (animate) {
-          // Стартуют выше экрана с небольшой задержкой по рядам и столбцам
           const startOffsetY = -(count * ROW_H + 55) - (count - r) * 18 - c * 4;
           cellPhysics[`${r},${c}`] = {
             ox: 0,
@@ -355,6 +349,7 @@ function startNewGame() {
   rowOffset = 0;
   shotsLeft = SHOTS_PER_DROP;
   bullet = null;
+  swapTransition = null;
   particles = [];
   fallingBubbles = [];
   gameOver = false;
@@ -367,11 +362,16 @@ function startNewGame() {
 }
 
 function swapBubbles() {
-  if (bullet || gameOver || isRefilling) return;
+  if (bullet || gameOver || isRefilling || swapTransition) return;
+  swapTransition = {
+    t: 0,
+    fromCurrent: currentColor,
+    fromNext: nextColor
+  };
   const tmp = currentColor;
   currentColor = nextColor;
   nextColor = tmp;
-  swapAnim = 1;
+  cannonSquashV += 0.12;
   SoundFX.playBounce();
   saveState();
 }
@@ -572,7 +572,23 @@ function snapBullet() {
 }
 
 function update() {
-  if (swapAnim > 0) swapAnim = Math.max(0, swapAnim - 0.12);
+  // Желейная пружина пушки (сжатие + отдача)
+  cannonSquashV += -cannonSquash * 0.24;
+  cannonSquashV *= 0.76;
+  cannonSquash += cannonSquashV;
+
+  cannonRecoilV += -cannonRecoil * 0.28;
+  cannonRecoilV *= 0.72;
+  cannonRecoil += cannonRecoilV;
+
+  // Анимация перекидывания шариков
+  if (swapTransition) {
+    swapTransition.t += 0.085;
+    if (swapTransition.t >= 1) {
+      swapTransition = null;
+      cannonSquashV += 0.16; // пушка мягко пружинит, поймав шарик
+    }
+  }
 
   for (const b of ambientBubbles) {
     b.y -= b.speed;
@@ -589,12 +605,11 @@ function update() {
     const p = cellPhysics[key];
 
     if (p.slidingIn) {
-      // Плавное скольжение сверху при заполнении поля
       p.oy *= 0.84;
       if (Math.abs(p.oy) < 1.5) {
         p.oy = 0;
         p.slidingIn = false;
-        p.wv += 0.16; // мягкий желейный отскок при приземлении
+        p.wv += 0.16;
       } else {
         anySliding = true;
       }
@@ -686,7 +701,6 @@ function update() {
   }
 }
 
-// Быстрая отрисовка мармеладного шарика из кэша
 function drawGummyBubble(x, y, colorIdx, radius = R, alpha = 1, sx = 1, sy = 1, rot = 0) {
   const sprite = bubbleSprites[colorIdx];
   if (!sprite) return;
@@ -792,42 +806,113 @@ function drawAimLine() {
   ctx.restore();
 }
 
+// Глянцевая Aero-пушка с желейной деформацией при выстреле
 function drawCannon() {
+  const sx = 1 + cannonSquash;
+  const sy = 1 - cannonSquash;
+
   ctx.save();
   ctx.translate(CANNON_X, CANNON_Y);
   ctx.rotate(aimAngle + Math.PI / 2);
-  const barrelGrad = ctx.createLinearGradient(-13, 0, 13, 0);
-  barrelGrad.addColorStop(0, "#7cd4ff");
-  barrelGrad.addColorStop(0.5, "#ffffff");
-  barrelGrad.addColorStop(1, "#4aa8e0");
-  ctx.fillStyle = barrelGrad;
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.92)";
-  ctx.lineWidth = 1.5;
+  ctx.translate(0, cannonRecoil * 0.45);
+  ctx.scale(sx, sy);
+
+  // Мягкая тень под пушкой
   ctx.beginPath();
-  ctx.roundRect(-12, -40, 24, 40, 8);
+  ctx.arc(0, 5, 31, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0, 75, 130, 0.16)";
   ctx.fill();
-  ctx.stroke();
-  ctx.restore();
 
-  const baseGrad = ctx.createRadialGradient(
-    CANNON_X - 8,
-    CANNON_Y - 10,
-    4,
-    CANNON_X,
-    CANNON_Y,
-    28
-  );
-  baseGrad.addColorStop(0, "#ffffff");
-  baseGrad.addColorStop(0.5, "#7be3ff");
-  baseGrad.addColorStop(1, "#0088cc");
+  // Ствол с плавным расширением к дулу
+  const barrelGrad = ctx.createLinearGradient(-16, 0, 16, 0);
+  barrelGrad.addColorStop(0, "#46b6f0");
+  barrelGrad.addColorStop(0.28, "#d4f4ff");
+  barrelGrad.addColorStop(0.55, "#ffffff");
+  barrelGrad.addColorStop(0.82, "#74d2ff");
+  barrelGrad.addColorStop(1, "#1c87cc");
 
   ctx.beginPath();
-  ctx.arc(CANNON_X, CANNON_Y, 27, 0, Math.PI * 2);
+  ctx.moveTo(-12, -16);
+  ctx.lineTo(-16, -44);
+  ctx.quadraticCurveTo(0, -50, 16, -44);
+  ctx.lineTo(12, -16);
+  ctx.closePath();
+  ctx.fillStyle = barrelGrad;
+  ctx.fill();
+  ctx.lineWidth = 1.6;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.92)";
+  ctx.stroke();
+
+  // Светящееся салатово-бирюзовое колечко у дула
+  const ringGrad = ctx.createLinearGradient(-16, -44, 16, -44);
+  ringGrad.addColorStop(0, "#5ce036");
+  ringGrad.addColorStop(0.5, "#dfff80");
+  ringGrad.addColorStop(1, "#2cb81f");
+  ctx.beginPath();
+  ctx.roundRect(-16.5, -45, 33, 7, 3.5);
+  ctx.fillStyle = ringGrad;
+  ctx.fill();
+  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+  ctx.stroke();
+
+  // Стеклянный корпус-сфера пушки
+  const baseGrad = ctx.createRadialGradient(-9, -12, 4, 0, 0, 31);
+  baseGrad.addColorStop(0, "#ffffff");
+  baseGrad.addColorStop(0.4, "#8ee6ff");
+  baseGrad.addColorStop(0.8, "#1fa8eb");
+  baseGrad.addColorStop(1, "#0b68a8");
+
+  ctx.beginPath();
+  ctx.arc(0, 0, 30, 0, Math.PI * 2);
   ctx.fillStyle = baseGrad;
   ctx.fill();
   ctx.lineWidth = 2.5;
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.92)";
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
   ctx.stroke();
+
+  // Глянцевый верхний блик на корпусе
+  ctx.beginPath();
+  ctx.ellipse(0, -13, 18, 9, 0, 0, Math.PI * 2);
+  const shine = ctx.createLinearGradient(0, -23, 0, -4);
+  shine.addColorStop(0, "rgba(255, 255, 255, 0.85)");
+  shine.addColorStop(1, "rgba(255, 255, 255, 0)");
+  ctx.fillStyle = shine;
+  ctx.fill();
+
+  // Внутреннее гнездо для шарика
+  ctx.beginPath();
+  ctx.arc(0, 0, 21, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.75)";
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawNextPod() {
+  // Надпись строго по центру НАД кружком — больше не заезжает на шарик
+  ctx.save();
+  ctx.fillStyle = "#0b4a78";
+  ctx.font = "800 13px 'Nunito', sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
+  ctx.fillText("след. ⇄", NEXT_X, NEXT_Y - 26);
+
+  // Стеклянная подставка для следующего шарика
+  const podGrad = ctx.createRadialGradient(NEXT_X - 6, NEXT_Y - 6, 3, NEXT_X, NEXT_Y, 22);
+  podGrad.addColorStop(0, "rgba(255, 255, 255, 0.92)");
+  podGrad.addColorStop(1, "rgba(175, 232, 255, 0.65)");
+  ctx.beginPath();
+  ctx.arc(NEXT_X, NEXT_Y, 22, 0, Math.PI * 2);
+  ctx.fillStyle = podGrad;
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
+  ctx.stroke();
+  ctx.restore();
 }
 
 function draw() {
@@ -867,26 +952,34 @@ function draw() {
 
   drawAimLine();
   drawCannon();
+  drawNextPod();
 
-  if (!bullet) {
-    const s = 1 + Math.sin(swapAnim * Math.PI) * 0.16;
-    drawGummyBubble(CANNON_X, CANNON_Y, currentColor, R - 2, 1, s, 2 - s, 0);
+  // Отрисовка шариков в пушке и в подставке (или их перекидывание по дуге)
+  if (swapTransition) {
+    const t = swapTransition.t;
+    // Плавное замедление (ease-in-out)
+    const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    const arc = Math.sin(ease * Math.PI);
+
+    // Старый текущий летит по верхней дуге в подставку
+    const x1 = CANNON_X + (NEXT_X - CANNON_X) * ease;
+    const y1 = CANNON_Y + (NEXT_Y - CANNON_Y) * ease - arc * 34;
+    const r1 = (R - 2) + (14 - (R - 2)) * ease;
+    drawGummyBubble(x1, y1, swapTransition.fromCurrent, r1, 1, 1 + arc * 0.1, 1 - arc * 0.1, 0);
+
+    // Старый следующий летит по нижней дуге в пушку
+    const x2 = NEXT_X + (CANNON_X - NEXT_X) * ease;
+    const y2 = NEXT_Y + (CANNON_Y - NEXT_Y) * ease + arc * 26;
+    const r2 = 14 + ((R - 2) - 14) * ease;
+    drawGummyBubble(x2, y2, swapTransition.fromNext, r2, 1, 1 + arc * 0.1, 1 - arc * 0.1, 0);
+  } else {
+    if (!bullet) {
+      const sx = 1 + cannonSquash * 0.7;
+      const sy = 1 - cannonSquash * 0.7;
+      drawGummyBubble(CANNON_X, CANNON_Y, currentColor, R - 2, 1, sx, sy, 0);
+    }
+    drawGummyBubble(NEXT_X, NEXT_Y, nextColor, 14);
   }
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(NEXT_X, NEXT_Y, 21, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(255, 255, 255, 0.65)";
-  ctx.fill();
-  ctx.lineWidth = 1.5;
-  ctx.strokeStyle = "#8bc8e8";
-  ctx.stroke();
-  ctx.restore();
-
-  ctx.fillStyle = "#0b3a63";
-  ctx.font = "800 13px 'Nunito', sans-serif";
-  ctx.fillText("след. ⇄", CANNON_X + 34, CANNON_Y + 4);
-  drawGummyBubble(NEXT_X, NEXT_Y, nextColor, 14);
 
   if (bullet) {
     const moveAngle = Math.atan2(bullet.vy, bullet.vx);
@@ -923,7 +1016,7 @@ function setAimFromPointer(e) {
 }
 
 function shoot() {
-  if (bullet || gameOver || isRefilling) return;
+  if (bullet || gameOver || isRefilling || swapTransition) return;
   bullet = {
     x: CANNON_X,
     y: CANNON_Y,
@@ -935,14 +1028,17 @@ function shoot() {
   };
   currentColor = nextColor;
   nextColor = pickColor();
+
+  // Желейная отдача пушки при выстреле
+  cannonSquashV += 0.28;
+  cannonRecoilV += 10;
+
   SoundFX.playShoot();
 }
 
-// Глобальное прицеливание и стрельба (даже если курсор вне поля, кроме зоны кнопок)
 window.addEventListener("pointermove", setAimFromPointer);
 
 window.addEventListener("pointerdown", (e) => {
-  // Игнорируем клики по любым кнопкам и окну проигрыша
   if (e.target.closest("button, .overlay-card")) return;
 
   if (e.button === 2) {
@@ -951,7 +1047,7 @@ window.addEventListener("pointerdown", (e) => {
   }
 
   const { x, y } = getCanvasCoords(e);
-  if (Math.hypot(x - NEXT_X, y - NEXT_Y) <= 24) {
+  if (Math.hypot(x - NEXT_X, y - NEXT_Y) <= 26) {
     swapBubbles();
     return;
   }
