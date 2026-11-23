@@ -1079,3 +1079,14 @@ function loop() {
   requestAnimationFrame(loop);
 }
 loop();
+// Желейный отскок для всех кнопок
+document.querySelectorAll("button").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    btn.classList.remove("jelly-pop");
+    void btn.offsetWidth; // перезапуск анимации при быстрых кликах
+    btn.classList.add("jelly-pop");
+  });
+  btn.addEventListener("animationend", () => {
+    btn.classList.remove("jelly-pop");
+  });
+});
