@@ -1,11 +1,11 @@
-const SAVE_KEY = "bubble_shooter_save_v1";
+const SAVE_KEY = "aero_jelly_bubbles_v2";
 
 const GameStorage = {
   save(data) {
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     } catch (e) {
-      // Игнорируем ошибку, если хранилище недоступно
+      // Игнорируем, если localStorage недоступен
     }
   },
 
