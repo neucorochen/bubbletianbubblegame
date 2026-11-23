@@ -1,90 +1,354 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>BUBBLE — Aero Jelly Game</title>
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body>
-  <div class="bg-orb orb-1"></div>
-  <div class="bg-orb orb-2"></div>
-  <div class="bg-orb orb-3"></div>
+* {
+  box-sizing: border-box;
+  user-select: none;
+  -webkit-user-select: none;
+}
 
-  <div class="aero-window">
-    <!-- Верхняя стеклянная рамка окна -->
-    <div class="window-bar">
-      <div class="win-controls" aria-hidden="true">
-        <span class="win-btn">—</span>
-        <span class="win-btn">□</span>
-        <span class="win-btn win-close">×</span>
-      </div>
-    </div>
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px 12px;
+  font-family: "Segoe UI", "Trebuchet MS", Tahoma, sans-serif;
+  color: #0b3a63;
+  overflow-x: hidden;
+  position: relative;
+  /* Небо с мягкими облаками */
+  background:
+    radial-gradient(ellipse at 20% 25%, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0) 42%),
+    radial-gradient(ellipse at 85% 30%, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0) 38%),
+    radial-gradient(ellipse at 70% 85%, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 45%),
+    linear-gradient(180deg, #1f5ea8 0%, #4495e0 48%, #85c5f5 100%);
+}
 
-    <!-- Глянцевая голубая шапка -->
-    <header class="aero-header">
-      <div class="brand-logo">BUBBLE</div>
-      <div class="header-status">
-        <span class="online-dot"></span>
-        <span>бесконечный режим</span>
-      </div>
-    </header>
+/* Парящие мыльные пузыри на фоне */
+.bg-orb {
+  position: fixed;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(
+    circle at 30% 28%,
+    rgba(255, 255, 255, 0.85),
+    rgba(255, 255, 255, 0.16) 55%,
+    rgba(170, 230, 255, 0.25) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow: inset 0 0 18px rgba(255, 255, 255, 0.5);
+}
 
-    <!-- Основное содержимое -->
-    <main class="aero-body">
-      <section class="game-card">
-        <div class="game-wrap">
-          <canvas id="game" width="480" height="660"></canvas>
-          <div class="overlay" id="gameOverOverlay">
-            <div class="overlay-card">
-              <h2>игра окончена</h2>
-              <p id="finalScoreText">очки: 0</p>
-              <button class="btn-lime" id="playAgainBtn">играть снова</button>
-            </div>
-          </div>
-        </div>
-      </section>
+.orb-1 { width: 170px; height: 170px; bottom: 4%; right: 6%; }
+.orb-2 { width: 115px; height: 115px; top: 10%; left: 4%; }
+.orb-3 { width: 75px; height: 75px; bottom: 26%; right: 16%; }
 
-      <!-- Правая панель в стиле виджетов сайта -->
-      <aside class="side-col">
-        <div class="aero-card">
-          <div class="card-title">статистика</div>
-          <div class="stat-row">
-            <span>очки</span>
-            <strong id="scoreEl">0</strong>
-          </div>
-          <div class="stat-row">
-            <span>рекорд</span>
-            <strong id="bestEl">0</strong>
-          </div>
-        </div>
+/* Стеклянное окно Windows Aero */
+.aero-window {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 790px;
+  padding: 6px 8px 10px;
+  border-radius: 14px;
+  background: linear-gradient(
+    180deg,
+    rgba(210, 238, 255, 0.68) 0%,
+    rgba(165, 215, 248, 0.52) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow:
+    0 22px 50px rgba(8, 45, 95, 0.42),
+    inset 0 1px 1px rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+}
 
-        <div class="aero-card">
-          <div class="card-title">до нового ряда</div>
-          <div class="drop-caption">
-            осталось выстрелов: <strong id="dropEl">6</strong>
-          </div>
-          <div class="progress-track">
-            <div class="progress-fill" id="dropBar" style="width: 100%"></div>
-          </div>
-          <button class="btn-lime full-w" id="swapBtn">⇄ поменять шар</button>
-        </div>
+/* Полоска с кнопками окна */
+.window-bar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 2px 6px;
+}
 
-        <div class="aero-card">
-          <div class="card-title">управление</div>
-          <button class="btn-glass full-w" id="musicBtn">🎵 музыка: выкл</button>
-          <button class="btn-glass full-w" id="resetBtn">начать заново</button>
-          <p class="hint-text">
-            клик — выстрел<br />
-            пробел / ПКМ — сменить шар
-          </p>
-        </div>
-      </aside>
-    </main>
-  </div>
+.win-controls {
+  display: flex;
+  gap: 3px;
+}
 
-  <script src="storage.js"></script>
-  <script src="audio.js"></script>
-  <script src="game.js"></script>
-</body>
-</html>
+.win-btn {
+  width: 24px;
+  height: 17px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0%, rgba(120, 175, 220, 0.45) 55%, rgba(80, 140, 195, 0.6) 100%);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+.win-close {
+  width: 34px;
+  background: linear-gradient(180deg, #ff998a 0%, #e04535 50%, #c7281a 52%, #e86b58 100%);
+}
+
+/* Голубая глянцевая шапка как на сайте */
+.aero-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-radius: 10px 10px 0 0;
+  border: 1px solid #76bce6;
+  border-bottom: none;
+  background: linear-gradient(
+    180deg,
+    #b7ecff 0%,
+    #77d2f7 48%,
+    #52bdf0 52%,
+    #88dcff 100%
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.brand-logo {
+  font-size: 23px;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.5px;
+  background: linear-gradient(180deg, #f4ff81 0%, #8be836 55%, #37b81a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 1px 2px rgba(0, 75, 115, 0.55));
+}
+
+.header-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  font-style: italic;
+  color: #0b3a63;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.online-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #d6ff80, #43c61f);
+  box-shadow: 0 0 6px #6de83a;
+}
+
+/* Внутреннее поле окна */
+.aero-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 235px;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 0 0 10px 10px;
+  border: 1px solid #8bc8e8;
+  background: linear-gradient(180deg, #e5f5fd 0%, #d4eefc 100%);
+}
+
+.game-card {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid #96cde8;
+  border-radius: 12px;
+  padding: 8px;
+  box-shadow: inset 0 1px 0 #ffffff;
+}
+
+.game-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 480 / 660;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1.5px solid #8cc8e8;
+  background: #dff4ff;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+/* Боковая колонка с карточками */
+.side-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.aero-card {
+  background: linear-gradient(180deg, #ffffff 0%, #edf8ff 100%);
+  border: 1px solid #96cde8;
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow:
+    0 2px 6px rgba(15, 95, 150, 0.08),
+    inset 0 1px 0 #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card-title {
+  font-size: 14px;
+  font-weight: 800;
+  font-style: italic;
+  color: #0b3a63;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #cbe7f7;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1d5b86;
+}
+
+.stat-row strong {
+  font-size: 20px;
+  color: #083459;
+}
+
+.drop-caption {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1d5b86;
+}
+
+/* Зелёный прогресс-бар как в блоке «оплата серверов» */
+.progress-track {
+  height: 12px;
+  border-radius: 999px;
+  background: #d8eefb;
+  border: 1px solid #96cde8;
+  overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0, 60, 110, 0.15);
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #d7f76c 0%, #8cd925 50%, #72c417 52%, #a9eb44 100%);
+  transition: width 0.2s ease;
+}
+
+/* Кнопки в стиле сайта */
+.full-w {
+  width: 100%;
+}
+
+.btn-glass {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #7ebce0;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  font-style: italic;
+  color: #0b3a63;
+  cursor: pointer;
+  background: linear-gradient(180deg, #ffffff 0%, #e1f3fc 48%, #cce8f9 52%, #e8f7ff 100%);
+  box-shadow:
+    0 2px 4px rgba(15, 90, 145, 0.12),
+    inset 0 1px 0 #ffffff;
+  transition: filter 0.15s ease, transform 0.1s ease;
+}
+
+.btn-glass:hover,
+.btn-lime:hover {
+  filter: brightness(1.04);
+}
+
+.btn-glass:active,
+.btn-lime:active {
+  transform: scale(0.97);
+}
+
+/* Салатовая глянцевая кнопка как «поддержать» */
+.btn-lime,
+.btn-glass.is-on {
+  padding: 9px 14px;
+  border-radius: 8px;
+  border: 1px solid #77b824;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  font-style: italic;
+  color: #183d04;
+  cursor: pointer;
+  background: linear-gradient(180deg, #e0fb7d 0%, #b1e83c 48%, #96d620 52%, #c3f257 100%);
+  box-shadow:
+    0 2px 6px rgba(85, 155, 15, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transition: filter 0.15s ease, transform 0.1s ease;
+}
+
+.hint-text {
+  margin: 2px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #367199;
+}
+
+/* Экран проигрыша */
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(165, 222, 252, 0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(6px);
+}
+
+.overlay.show {
+  display: flex;
+}
+
+.overlay-card {
+  width: 100%;
+  max-width: 300px;
+  padding: 24px 20px;
+  text-align: center;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #e5f5fd 100%);
+  border: 1.5px solid #8cc8e8;
+  box-shadow: 0 14px 30px rgba(10, 75, 125, 0.28);
+}
+
+.overlay-card h2 {
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-style: italic;
+  color: #0b3a63;
+}
+
+.overlay-card p {
+  margin: 0 0 18px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1d5b86;
+}
+
+@media (max-width: 720px) {
+  .aero-body {
+    grid-template-columns: 1fr;
+  }
+}
