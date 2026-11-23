@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Aero Jelly Bubbles</title>
+  <title>BUBBLE — Aero Jelly Game</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -11,25 +11,76 @@
   <div class="bg-orb orb-2"></div>
   <div class="bg-orb orb-3"></div>
 
-  <div class="hud">
-    <div class="stat"><span>Очки</span><strong id="scoreEl">0</strong></div>
-    <div class="stat"><span>Рекорд</span><strong id="bestEl">0</strong></div>
-    <div class="stat"><span>До сдвига</span><strong id="dropEl">6</strong></div>
-    <div class="hud-actions">
-      <button class="btn-aero btn-music" id="musicBtn" title="Фоновая музыка">🎵 Выкл</button>
-      <button class="btn-aero" id="resetBtn">Заново</button>
-    </div>
-  </div>
-
-  <div class="game-wrap">
-    <canvas id="game" width="480" height="660"></canvas>
-    <div class="overlay" id="gameOverOverlay">
-      <div class="overlay-card">
-        <h2>Игра окончена</h2>
-        <p id="finalScoreText">Очки: 0</p>
-        <button class="btn-aero btn-green" id="playAgainBtn">Играть снова</button>
+  <div class="aero-window">
+    <!-- Верхняя стеклянная рамка окна -->
+    <div class="window-bar">
+      <div class="win-controls" aria-hidden="true">
+        <span class="win-btn">—</span>
+        <span class="win-btn">□</span>
+        <span class="win-btn win-close">×</span>
       </div>
     </div>
+
+    <!-- Глянцевая голубая шапка -->
+    <header class="aero-header">
+      <div class="brand-logo">BUBBLE</div>
+      <div class="header-status">
+        <span class="online-dot"></span>
+        <span>бесконечный режим</span>
+      </div>
+    </header>
+
+    <!-- Основное содержимое -->
+    <main class="aero-body">
+      <section class="game-card">
+        <div class="game-wrap">
+          <canvas id="game" width="480" height="660"></canvas>
+          <div class="overlay" id="gameOverOverlay">
+            <div class="overlay-card">
+              <h2>игра окончена</h2>
+              <p id="finalScoreText">очки: 0</p>
+              <button class="btn-lime" id="playAgainBtn">играть снова</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Правая панель в стиле виджетов сайта -->
+      <aside class="side-col">
+        <div class="aero-card">
+          <div class="card-title">статистика</div>
+          <div class="stat-row">
+            <span>очки</span>
+            <strong id="scoreEl">0</strong>
+          </div>
+          <div class="stat-row">
+            <span>рекорд</span>
+            <strong id="bestEl">0</strong>
+          </div>
+        </div>
+
+        <div class="aero-card">
+          <div class="card-title">до нового ряда</div>
+          <div class="drop-caption">
+            осталось выстрелов: <strong id="dropEl">6</strong>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="dropBar" style="width: 100%"></div>
+          </div>
+          <button class="btn-lime full-w" id="swapBtn">⇄ поменять шар</button>
+        </div>
+
+        <div class="aero-card">
+          <div class="card-title">управление</div>
+          <button class="btn-glass full-w" id="musicBtn">🎵 музыка: выкл</button>
+          <button class="btn-glass full-w" id="resetBtn">начать заново</button>
+          <p class="hint-text">
+            клик — выстрел<br />
+            пробел / ПКМ — сменить шар
+          </p>
+        </div>
+      </aside>
+    </main>
   </div>
 
   <script src="storage.js"></script>
