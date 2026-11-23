@@ -10,14 +10,134 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
- <!-- Детализированный фон Frutiger Aero -->
+  <!-- Анимированный фон Frutiger Aero -->
   <div class="aero-bg" aria-hidden="true">
-    <div class="aero-sun"></div>
-    <div class="aero-wave wave-1"></div>
-    <div class="aero-wave wave-2"></div>
-    <div class="aero-hill hill-back"></div>
-    <div class="aero-hill hill-front"></div>
+    <svg class="aero-scene" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <!-- Небо -->
+        <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#0072d6" />
+          <stop offset="45%" stop-color="#2eb5ff" />
+          <stop offset="78%" stop-color="#a6eeff" />
+          <stop offset="100%" stop-color="#e3fbff" />
+        </linearGradient>
 
+        <!-- Солнце -->
+        <radialGradient id="sunGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#ffffff" stop-opacity="1" />
+          <stop offset="22%" stop-color="#ffffff" stop-opacity="0.85" />
+          <stop offset="55%" stop-color="#b8f4ff" stop-opacity="0.3" />
+          <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+        </radialGradient>
+
+        <!-- Радуга -->
+        <linearGradient id="rainbowGrad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#ff6b9d" stop-opacity="0" />
+          <stop offset="20%" stop-color="#ff7aa2" stop-opacity="0.45" />
+          <stop offset="40%" stop-color="#ffe066" stop-opacity="0.45" />
+          <stop offset="60%" stop-color="#66ff99" stop-opacity="0.45" />
+          <stop offset="80%" stop-color="#66d9ff" stop-opacity="0.45" />
+          <stop offset="100%" stop-color="#a385ff" stop-opacity="0" />
+        </linearGradient>
+
+        <!-- Стекло небоскрёбов -->
+        <linearGradient id="glassTower" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#e8fbff" stop-opacity="0.95" />
+          <stop offset="35%" stop-color="#76d8ff" stop-opacity="0.88" />
+          <stop offset="70%" stop-color="#1982d8" stop-opacity="0.92" />
+          <stop offset="100%" stop-color="#0b4e96" stop-opacity="0.95" />
+        </linearGradient>
+
+        <linearGradient id="glassTowerLight" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9" />
+          <stop offset="50%" stop-color="#9ee8ff" stop-opacity="0.82" />
+          <stop offset="100%" stop-color="#3aa2eb" stop-opacity="0.88" />
+        </linearGradient>
+
+        <!-- Озеро -->
+        <linearGradient id="lakeGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#6ee2ff" />
+          <stop offset="45%" stop-color="#2aa8f5" />
+          <stop offset="100%" stop-color="#0f6ec9" />
+        </linearGradient>
+
+        <!-- Зелёные холмы -->
+        <linearGradient id="hillFar" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#9ef759" />
+          <stop offset="100%" stop-color="#38b836" />
+        </linearGradient>
+
+        <linearGradient id="hillNear" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#c9ff66" />
+          <stop offset="38%" stop-color="#63db2c" />
+          <stop offset="100%" stop-color="#1e9424" />
+        </linearGradient>
+      </defs>
+
+      <!-- Небо -->
+      <rect width="1440" height="900" fill="url(#skyGrad)" />
+
+      <!-- Солнце слева вверху -->
+      <circle class="sun-pulse" cx="155" cy="145" r="240" fill="url(#sunGlow)" />
+
+      <!-- Радуга -->
+      <path class="rainbow-arc" d="M 300 620 Q 860 110 1480 470" fill="none" stroke="url(#rainbowGrad)" stroke-width="46" stroke-linecap="round" />
+
+      <!-- Плывущие облака -->
+      <g class="cloud cloud-1" opacity="0.85">
+        <ellipse cx="260" cy="210" rx="95" ry="34" fill="#ffffff" />
+        <ellipse cx="320" cy="195" rx="68" ry="38" fill="#ffffff" />
+        <ellipse cx="210" cy="215" rx="55" ry="26" fill="#ffffff" />
+      </g>
+      <g class="cloud cloud-2" opacity="0.75">
+        <ellipse cx="860" cy="140" rx="110" ry="36" fill="#ffffff" />
+        <ellipse cx="920" cy="122" rx="75" ry="42" fill="#ffffff" />
+        <ellipse cx="795" cy="145" rx="60" ry="28" fill="#ffffff" />
+      </g>
+      <g class="cloud cloud-3" opacity="0.8">
+        <ellipse cx="1310" cy="160" rx="115" ry="40" fill="#ffffff" />
+        <ellipse cx="1370" cy="140" rx="80" ry="46" fill="#ffffff" />
+      </g>
+
+      <!-- Упрощённый футуристичный город справа -->
+      <g class="city-skyline">
+        <!-- Дальние башни -->
+        <path d="M 630 580 L 642 435 Q 655 425 668 435 L 678 580 Z" fill="url(#glassTowerLight)" opacity="0.75" />
+        <path d="M 735 580 L 748 390 Q 765 375 782 390 L 795 580 Z" fill="url(#glassTowerLight)" opacity="0.82" />
+        <path d="M 1185 570 L 1198 410 Q 1212 398 1226 410 L 1238 570 Z" fill="url(#glassTowerLight)" opacity="0.8" />
+        <path d="M 1255 565 L 1278 330 L 1304 565 Z" fill="url(#glassTowerLight)" opacity="0.85" />
+
+        <!-- Главные стеклянные небоскрёбы -->
+        <path d="M 805 585 L 818 245 Q 852 225 886 245 L 898 585 Z" fill="url(#glassTower)" />
+        <path d="M 896 585 L 906 290 Q 926 280 946 290 L 955 585 Z" fill="url(#glassTowerLight)" />
+        <path d="M 950 585 L 972 150 L 1018 115 L 1038 585 Z" fill="url(#glassTower)" />
+        <path d="M 1055 585 L 1068 205 Q 1110 182 1148 205 L 1162 585 Z" fill="url(#glassTower)" />
+
+        <!-- Светлые вертикальные блики на стекле -->
+        <rect x="828" y="255" width="12" height="310" fill="#ffffff" opacity="0.35" />
+        <rect x="984" y="155" width="14" height="410" fill="#ffffff" opacity="0.35" />
+        <rect x="1082" y="215" width="14" height="350" fill="#ffffff" opacity="0.32" />
+      </g>
+
+      <!-- Дальний зелёный берег -->
+      <path d="M -40 590 Q 260 545 580 575 T 1480 515 L 1480 720 L -40 720 Z" fill="url(#hillFar)" />
+
+      <!-- Озеро слева -->
+      <path d="M -20 620 Q 260 585 520 635 Q 720 675 560 735 L -20 770 Z" fill="url(#lakeGrad)" />
+      <!-- Лёгкие блики воды -->
+      <g class="lake-shimmer" opacity="0.45">
+        <ellipse cx="190" cy="655" rx="95" ry="6" fill="#ffffff" />
+        <ellipse cx="340" cy="682" rx="75" ry="5" fill="#d9faff" />
+        <ellipse cx="120" cy="705" rx="110" ry="7" fill="#ffffff" />
+      </g>
+
+      <!-- Передний зелёный склон -->
+      <path d="M -40 745 Q 380 700 840 625 Q 1160 570 1480 520 L 1480 920 L -40 920 Z" fill="url(#hillNear)" />
+      <!-- Солнечный блик по кромке травы -->
+      <path d="M -40 748 Q 380 703 840 628 Q 1160 573 1480 523" fill="none" stroke="#eaff99" stroke-width="5" opacity="0.65" />
+    </svg>
+
+    <!-- Парящие мыльные пузыри -->
     <div class="bg-orb orb-1"></div>
     <div class="bg-orb orb-2"></div>
     <div class="bg-orb orb-3"></div>
@@ -25,8 +145,12 @@
     <div class="bg-orb orb-5"></div>
     <div class="bg-orb orb-6"></div>
     <div class="bg-orb orb-7"></div>
+
+    <!-- Крупные стеклянные сферы на переднем плане у травы -->
+    <div class="fg-orb fg-1"></div>
+    <div class="fg-orb fg-2"></div>
   </div>
-  
+
   <div class="aero-window">
     <div class="window-bar">
       <div class="win-controls" aria-hidden="true">
