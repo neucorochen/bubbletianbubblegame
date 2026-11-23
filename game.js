@@ -884,7 +884,7 @@ function draw() {
   ctx.restore();
 
   ctx.fillStyle = "#0b3a63";
-  ctx.font = "italic 700 12px Segoe UI";
+  ctx.font = "800 13px 'Nunito', sans-serif";
   ctx.fillText("след. ⇄", CANNON_X + 34, CANNON_Y + 4);
   drawGummyBubble(NEXT_X, NEXT_Y, nextColor, 14);
 
