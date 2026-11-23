@@ -1027,9 +1027,7 @@ function shoot() {
   SoundFX.playShoot();
 }
 
-window.addEventListener("pointermove", setAimFromPointer);
-
-window.addEventListener("pointerdown", (e) => {
+pointermove
   if (e.target.closest("button, .overlay-card")) return;
 
   if (e.button === 2) {
