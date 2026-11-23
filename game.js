@@ -186,6 +186,9 @@ let cannonRecoilV = 0;
 // Плавное перекидывание текущего и следующего шарика
 let swapTransition = null;
 
+// Прицеливание на сенсорных экранах
+let isTouchAiming = false;
+
 const ambientBubbles = Array.from({ length: 10 }, () => ({
   x: Math.random() * W,
   y: Math.random() * H,
@@ -351,6 +354,7 @@ function startNewGame() {
   shotsLeft = SHOTS_PER_DROP;
   bullet = null;
   swapTransition = null;
+  isTouchAiming = false;
   particles = [];
   fallingBubbles = [];
   gameOver = false;
@@ -416,6 +420,7 @@ function checkGameOver() {
     for (let c = 0; c < grid[r].length; c++) {
       if (grid[r][c] !== null) {
         gameOver = true;
+        isTouchAiming = false;
         if (score > bestScore) bestScore = score;
         finalScoreText.textContent = `очки: ${score} • рекорд: ${bestScore}`;
         gameOverOverlay.classList.add("show");
@@ -1027,7 +1032,14 @@ function shoot() {
   SoundFX.playShoot();
 }
 
-pointermove
+// Прицеливание и стрельба: на ПК — по клику, на телефоне — зажал, прицелился, отпустил
+window.addEventListener("pointermove", (e) => {
+  if (e.pointerType === "mouse" || isTouchAiming) {
+    setAimFromPointer(e);
+  }
+});
+
+window.addEventListener("pointerdown", (e) => {
   if (e.target.closest("button, .overlay-card")) return;
 
   if (e.button === 2) {
@@ -1042,8 +1054,28 @@ pointermove
   }
 
   setAimFromPointer(e);
+
+  if (e.pointerType === "touch" || e.pointerType === "pen") {
+    isTouchAiming = true;
+  } else {
+    shoot();
+  }
+});
+
+window.addEventListener("pointerup", (e) => {
+  if (!isTouchAiming) return;
+  isTouchAiming = false;
+  setAimFromPointer(e);
   shoot();
 });
+
+window.addEventListener("pointercancel", () => {
+  isTouchAiming = false;
+});
+
+window.addEventListener("touchmove", (e) => {
+  if (isTouchAiming) e.preventDefault();
+}, { passive: false });
 
 window.addEventListener("contextmenu", (e) => {
   if (!e.target.closest("button")) e.preventDefault();
@@ -1066,6 +1098,18 @@ musicBtn.addEventListener("click", async () => {
   musicBtn.classList.toggle("is-on", isOn);
 });
 
+// Желейный отскок для всех кнопок
+document.querySelectorAll("button").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    btn.classList.remove("jelly-pop");
+    void btn.offsetWidth;
+    btn.classList.add("jelly-pop");
+  });
+  btn.addEventListener("animationend", () => {
+    btn.classList.remove("jelly-pop");
+  });
+});
+
 initCachedSprites();
 if (!loadState()) {
   startNewGame();
@@ -1077,14 +1121,3 @@ function loop() {
   requestAnimationFrame(loop);
 }
 loop();
-// Желейный отскок для всех кнопок
-document.querySelectorAll("button").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    btn.classList.remove("jelly-pop");
-    void btn.offsetWidth; // перезапуск анимации при быстрых кликах
-    btn.classList.add("jelly-pop");
-  });
-  btn.addEventListener("animationend", () => {
-    btn.classList.remove("jelly-pop");
-  });
-});
