@@ -4,7 +4,9 @@ const ctx = canvas.getContext("2d");
 const scoreEl = document.getElementById("scoreEl");
 const bestEl = document.getElementById("bestEl");
 const dropEl = document.getElementById("dropEl");
+const dropBar = document.getElementById("dropBar");
 const resetBtn = document.getElementById("resetBtn");
+const swapBtn = document.getElementById("swapBtn");
 const musicBtn = document.getElementById("musicBtn");
 const gameOverOverlay = document.getElementById("gameOverOverlay");
 const finalScoreText = document.getElementById("finalScoreText");
@@ -19,6 +21,8 @@ const DANGER_ROW = 13;
 const DANGER_Y = DANGER_ROW * ROW_H + R;
 const CANNON_X = W / 2;
 const CANNON_Y = H - 48;
+const NEXT_X = CANNON_X + 98;
+const NEXT_Y = CANNON_Y;
 const SHOT_SPEED = 14.5;
 const SHOTS_PER_DROP = 6;
 
@@ -32,13 +36,14 @@ const COLORS = [
 ];
 
 let grid = [];
-let cellPhysics = {}; // Хранит желейную пружину и скольжение для каждой ячейки
+let cellPhysics = {};
 let rowOffset = 0;
 let score = 0;
 let bestScore = 0;
 let shotsLeft = SHOTS_PER_DROP;
 let currentColor = 0;
 let nextColor = 1;
+let swapAnim = 0;
 let aimAngle = -Math.PI / 2;
 let bullet = null;
 let particles = [];
@@ -85,7 +90,6 @@ function getNeighbors(r, c) {
   return res;
 }
 
-// Желейный импульс и скользящее смещение для ячейки
 function triggerJelly(r, c, strength = 0.28, dx = 0, dy = 0) {
   const key = `${r},${c}`;
   if (!cellPhysics[key]) {
@@ -97,7 +101,6 @@ function triggerJelly(r, c, strength = 0.28, dx = 0, dy = 0) {
   p.wv += strength;
 }
 
-// Волна колебаний по соседним шарикам при ударе
 function rippleNeighbors(r, c, impactVx, impactVy) {
   for (const [nr, nc] of getNeighbors(r, c)) {
     if (grid[nr][nc] !== null) {
@@ -152,6 +155,7 @@ function updateHUD() {
   scoreEl.textContent = score;
   bestEl.textContent = bestScore;
   dropEl.textContent = shotsLeft;
+  dropBar.style.width = `${(shotsLeft / SHOTS_PER_DROP) * 100}%`;
 }
 
 function saveState() {
@@ -205,6 +209,17 @@ function startNewGame() {
   saveState();
 }
 
+// Смена текущего и следующего шарика местами
+function swapBubbles() {
+  if (bullet || gameOver) return;
+  const tmp = currentColor;
+  currentColor = nextColor;
+  nextColor = tmp;
+  swapAnim = 1;
+  SoundFX.playBounce();
+  saveState();
+}
+
 function spawnParticles(x, y, colorIdx) {
   const col = COLORS[colorIdx];
   for (let i = 0; i < 9; i++) {
@@ -229,7 +244,6 @@ function addNewRowAtTop() {
   grid.pop();
   cellPhysics = {};
 
-  // Мягкое сотрясение всех шаров при опускании ряда
   for (let r = 0; r < MAX_ROWS; r++) {
     for (let c = 0; c < grid[r].length; c++) {
       if (grid[r][c] !== null) {
@@ -246,7 +260,7 @@ function checkGameOver() {
       if (grid[r][c] !== null) {
         gameOver = true;
         if (score > bestScore) bestScore = score;
-        finalScoreText.textContent = `Очки: ${score} • Рекорд: ${bestScore}`;
+        finalScoreText.textContent = `очки: ${score} • рекорд: ${bestScore}`;
         gameOverOverlay.classList.add("show");
         updateHUD();
         saveState();
@@ -304,11 +318,9 @@ function snapBullet() {
   grid[r][c] = color;
   bullet = null;
 
-  // Скользящее вплывание в ячейку + желейная волна по соседям
   triggerJelly(r, c, 0.34, dx, dy);
   rippleNeighbors(r, c, ivx, ivy);
 
-  // Поиск группы одного цвета
   const visited = new Set([`${r},${c}`]);
   const cluster = [[r, c]];
   const queue = [[r, c]];
@@ -335,7 +347,6 @@ function snapBullet() {
     });
     score += cluster.length * 10;
 
-    // Поиск оторвавшихся шаров любых цветов
     const anchored = new Set();
     const aQueue = [];
     for (let col = 0; col < grid[0].length; col++) {
@@ -405,6 +416,8 @@ function snapBullet() {
 }
 
 function update() {
+  if (swapAnim > 0) swapAnim = Math.max(0, swapAnim - 0.12);
+
   for (const b of ambientBubbles) {
     b.y -= b.speed;
     b.drift += 0.015;
@@ -415,11 +428,8 @@ function update() {
     }
   }
 
-  // Пружинная физика скольжения и желейной тряски в сетке
   for (const key in cellPhysics) {
     const p = cellPhysics[key];
-
-    // Скользящее возвращение в центр ячейки (пружина с мягким затуханием)
     p.ovx += -p.ox * 0.24;
     p.ovy += -p.oy * 0.24;
     p.ovx *= 0.72;
@@ -427,7 +437,6 @@ function update() {
     p.ox += p.ovx;
     p.oy += p.ovy;
 
-    // Желейное сжатие/растяжение
     p.wv += -p.wobble * 0.28;
     p.wv *= 0.8;
     p.wobble += p.wv;
@@ -448,7 +457,6 @@ function update() {
     bullet.x += bullet.vx;
     bullet.y += bullet.vy;
 
-    // Затухание желейной тряски самой пули после отскока
     bullet.wv += -bullet.wobble * 0.3;
     bullet.wv *= 0.78;
     bullet.wobble += bullet.wv;
@@ -482,7 +490,6 @@ function update() {
     if (collided) snapBullet();
   }
 
-  // Падающие желейные шарики
   for (let i = fallingBubbles.length - 1; i >= 0; i--) {
     const fb = fallingBubbles[i];
     fb.x += fb.vx;
@@ -509,14 +516,14 @@ function update() {
 
 function drawCanvasBackground() {
   const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
-  bgGrad.addColorStop(0, "rgba(215, 247, 255, 0.72)");
-  bgGrad.addColorStop(0.65, "rgba(180, 240, 255, 0.45)");
-  bgGrad.addColorStop(1, "rgba(155, 245, 195, 0.58)");
+  bgGrad.addColorStop(0, "#d9f3ff");
+  bgGrad.addColorStop(0.6, "#ebf9ff");
+  bgGrad.addColorStop(1, "#d3f5ec");
   ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, W, H);
 
-  const sun = ctx.createRadialGradient(W * 0.25, 0, 10, W * 0.25, 0, 260);
-  sun.addColorStop(0, "rgba(255, 255, 255, 0.75)");
+  const sun = ctx.createRadialGradient(W * 0.22, 0, 10, W * 0.22, 0, 260);
+  sun.addColorStop(0, "rgba(255, 255, 255, 0.85)");
   sun.addColorStop(1, "rgba(255, 255, 255, 0)");
   ctx.fillStyle = sun;
   ctx.fillRect(0, 0, W, H);
@@ -533,19 +540,18 @@ function drawCanvasBackground() {
       b.y,
       b.r
     );
-    g.addColorStop(0, "rgba(255, 255, 255, 0.65)");
-    g.addColorStop(0.7, "rgba(255, 255, 255, 0.12)");
-    g.addColorStop(1, "rgba(140, 230, 255, 0.28)");
+    g.addColorStop(0, "rgba(255, 255, 255, 0.7)");
+    g.addColorStop(0.7, "rgba(255, 255, 255, 0.14)");
+    g.addColorStop(1, "rgba(120, 215, 255, 0.28)");
     ctx.fillStyle = g;
     ctx.fill();
     ctx.lineWidth = 1;
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
     ctx.stroke();
     ctx.restore();
   }
 }
 
-// Желейный шарик с поддержкой squash & stretch (scaleX, scaleY, rotation)
 function drawJellyBubble(x, y, colorIdx, radius = R, alpha = 1, sx = 1, sy = 1, rot = 0) {
   const c = COLORS[colorIdx];
   ctx.save();
@@ -554,13 +560,11 @@ function drawJellyBubble(x, y, colorIdx, radius = R, alpha = 1, sx = 1, sy = 1, 
   if (rot !== 0) ctx.rotate(rot);
   ctx.scale(sx, sy);
 
-  // Мягкая тень
   ctx.beginPath();
   ctx.arc(0, 2, radius - 1, 0, Math.PI * 2);
   ctx.fillStyle = "rgba(0, 65, 110, 0.16)";
   ctx.fill();
 
-  // Основное желейное тело
   const bodyGrad = ctx.createRadialGradient(
     -radius * 0.25,
     -radius * 0.3,
@@ -578,7 +582,6 @@ function drawJellyBubble(x, y, colorIdx, radius = R, alpha = 1, sx = 1, sy = 1, 
   ctx.fillStyle = bodyGrad;
   ctx.fill();
 
-  // Внутреннее просвечивание снизу
   const bounceGrad = ctx.createRadialGradient(
     radius * 0.2,
     radius * 0.45,
@@ -594,7 +597,6 @@ function drawJellyBubble(x, y, colorIdx, radius = R, alpha = 1, sx = 1, sy = 1, 
   ctx.fillStyle = bounceGrad;
   ctx.fill();
 
-  // Глянцевый верхний блик
   ctx.beginPath();
   ctx.ellipse(0, -radius * 0.38, radius * 0.56, radius * 0.32, 0, 0, Math.PI * 2);
   const shineGrad = ctx.createLinearGradient(0, -radius * 0.72, 0, 0);
@@ -603,13 +605,11 @@ function drawJellyBubble(x, y, colorIdx, radius = R, alpha = 1, sx = 1, sy = 1, 
   ctx.fillStyle = shineGrad;
   ctx.fill();
 
-  // Яркая точка-блик
   ctx.beginPath();
   ctx.arc(-radius * 0.34, -radius * 0.34, radius * 0.13, 0, Math.PI * 2);
   ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
   ctx.fill();
 
-  // Стеклянная каёмка
   ctx.beginPath();
   ctx.arc(0, 0, radius - 1.2, 0, Math.PI * 2);
   ctx.lineWidth = 1.2;
@@ -619,30 +619,98 @@ function drawJellyBubble(x, y, colorIdx, radius = R, alpha = 1, sx = 1, sy = 1, 
   ctx.restore();
 }
 
+// Точная траектория полёта с отскоками от стен и точкой попадания
 function drawAimLine() {
   if (bullet || gameOver) return;
+
   let x = CANNON_X;
   let y = CANNON_Y;
   let vx = Math.cos(aimAngle);
   let vy = Math.sin(aimAngle);
+  const step = 4;
+
+  const points = [{ x, y }];
+  const bounces = [];
+
+  for (let i = 0; i < 360; i++) {
+    x += vx * step;
+    y += vy * step;
+
+    if (x - R <= 0) {
+      x = R;
+      vx *= -1;
+      points.push({ x, y });
+      bounces.push({ x, y });
+    } else if (x + R >= W) {
+      x = W - R;
+      vx *= -1;
+      points.push({ x, y });
+      bounces.push({ x, y });
+    }
+
+    let hit = y - R <= 0;
+    if (!hit) {
+      outer: for (let r = 0; r < MAX_ROWS; r++) {
+        for (let c = 0; c < grid[r].length; c++) {
+          if (grid[r][c] === null) continue;
+          const center = getCellCenter(r, c);
+          if (Math.hypot(x - center.x, y - center.y) < R * 1.82) {
+            hit = true;
+            break outer;
+          }
+        }
+      }
+    }
+
+    if (hit) {
+      points.push({ x, y });
+      break;
+    }
+  }
+
+  const col = COLORS[currentColor].main;
 
   ctx.save();
-  ctx.strokeStyle = "rgba(0, 120, 190, 0.55)";
-  ctx.lineWidth = 3;
-  ctx.setLineDash([7, 8]);
-  ctx.beginPath();
-  ctx.moveTo(x, y);
+  // Белая обводка пунктира для чёткости
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.setLineDash([7, 9]);
 
-  for (let i = 0; i < 420; i += 6) {
-    x += vx * 6;
-    y += vy * 6;
-    if (x - R <= 0 || x + R >= W) {
-      vx *= -1;
-      x = Math.max(R, Math.min(W - R, x));
-    }
-    ctx.lineTo(x, y);
-    if (y <= R) break;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  points.forEach((pt, idx) => (idx === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y)));
+  ctx.stroke();
+
+  // Цветная линия траектории
+  ctx.strokeStyle = col;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  points.forEach((pt, idx) => (idx === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y)));
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Точки отскока от стен
+  for (const b of bounces) {
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 5, 0, Math.PI * 2);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = col;
+    ctx.stroke();
   }
+
+  // Призрачный контур шарика в конечной точке попадания
+  const end = points[points.length - 1];
+  ctx.beginPath();
+  ctx.arc(end.x, end.y, R - 2, 0, Math.PI * 2);
+  ctx.fillStyle = col;
+  ctx.globalAlpha = 0.2;
+  ctx.fill();
+  ctx.globalAlpha = 0.85;
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = col;
   ctx.stroke();
   ctx.restore();
 }
@@ -656,7 +724,7 @@ function drawCannon() {
   barrelGrad.addColorStop(0.5, "#ffffff");
   barrelGrad.addColorStop(1, "#4aa8e0");
   ctx.fillStyle = barrelGrad;
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.92)";
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.roundRect(-12, -40, 24, 40, 8);
@@ -699,7 +767,6 @@ function draw() {
   ctx.stroke();
   ctx.restore();
 
-  // Сетка шаров с желейным сжатием и скольжением
   for (let r = 0; r < MAX_ROWS; r++) {
     for (let c = 0; c < grid[r].length; c++) {
       if (grid[r][c] !== null) {
@@ -713,7 +780,6 @@ function draw() {
     }
   }
 
-  // Падающие шарики слегка колышутся в полёте
   for (const fb of fallingBubbles) {
     const w = Math.sin(fb.wobblePhase) * 0.1;
     drawJellyBubble(fb.x, fb.y, fb.color, R * fb.scale, fb.alpha, 1 + w, 1 - w, 0);
@@ -722,15 +788,28 @@ function draw() {
   drawAimLine();
   drawCannon();
 
+  // Текущий шарик в пушке (с лёгким пружинным эффектом при смене)
   if (!bullet) {
-    drawJellyBubble(CANNON_X, CANNON_Y, currentColor, R - 2);
+    const s = 1 + Math.sin(swapAnim * Math.PI) * 0.16;
+    drawJellyBubble(CANNON_X, CANNON_Y, currentColor, R - 2, 1, s, 2 - s, 0);
   }
-  ctx.fillStyle = "#0b4f75";
-  ctx.font = "600 12px Segoe UI";
-  ctx.fillText("След.:", CANNON_X + 46, CANNON_Y + 4);
-  drawJellyBubble(CANNON_X + 98, CANNON_Y, nextColor, 14);
 
-  // Летящий шарик слегка вытягивается по направлению движения
+  // Следующий шарик (кликабельный для смены)
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(NEXT_X, NEXT_Y, 21, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.65)";
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = "#8bc8e8";
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.fillStyle = "#0b3a63";
+  ctx.font = "italic 700 12px Segoe UI";
+  ctx.fillText("след. ⇄", CANNON_X + 34, CANNON_Y + 4);
+  drawJellyBubble(NEXT_X, NEXT_Y, nextColor, 14);
+
   if (bullet) {
     const moveAngle = Math.atan2(bullet.vy, bullet.vx);
     const sx = 1.09 + bullet.wobble;
@@ -749,11 +828,17 @@ function draw() {
   }
 }
 
-function setAimFromPointer(e) {
+function getCanvasCoords(e) {
   const rect = canvas.getBoundingClientRect();
-  const px = ((e.clientX - rect.left) / rect.width) * W;
-  const py = ((e.clientY - rect.top) / rect.height) * H;
-  let angle = Math.atan2(py - CANNON_Y, px - CANNON_X);
+  return {
+    x: ((e.clientX - rect.left) / rect.width) * W,
+    y: ((e.clientY - rect.top) / rect.height) * H
+  };
+}
+
+function setAimFromPointer(e) {
+  const { x, y } = getCanvasCoords(e);
+  let angle = Math.atan2(y - CANNON_Y, x - CANNON_X);
   if (angle > -0.15) angle = -0.15;
   if (angle < -Math.PI + 0.15) angle = -Math.PI + 0.15;
   aimAngle = angle;
@@ -776,17 +861,38 @@ function shoot() {
 }
 
 canvas.addEventListener("pointermove", setAimFromPointer);
+
 canvas.addEventListener("pointerdown", (e) => {
+  if (e.button === 2) {
+    swapBubbles();
+    return;
+  }
+  const { x, y } = getCanvasCoords(e);
+  // Клик по кружку со следующим шариком меняет шарики местами вместо выстрела
+  if (Math.hypot(x - NEXT_X, y - NEXT_Y) <= 24) {
+    swapBubbles();
+    return;
+  }
   setAimFromPointer(e);
   shoot();
 });
 
+canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+
+window.addEventListener("keydown", (e) => {
+  if (e.code === "Space") {
+    e.preventDefault();
+    swapBubbles();
+  }
+});
+
+swapBtn.addEventListener("click", swapBubbles);
 resetBtn.addEventListener("click", startNewGame);
 playAgainBtn.addEventListener("click", startNewGame);
 
 musicBtn.addEventListener("click", async () => {
   const isOn = await BgMusic.toggle();
-  musicBtn.textContent = isOn ? "🎵 Вкл" : "🎵 Выкл";
+  musicBtn.textContent = isOn ? "🎵 музыка: вкл" : "🎵 музыка: выкл";
   musicBtn.classList.toggle("is-on", isOn);
 });
 
